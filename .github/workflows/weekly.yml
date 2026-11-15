@@ -10,7 +10,7 @@ permissions: {contents: read}
 jobs:
   weekly:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
       DISCORD_REVIEWS_CHANNEL_ID: ${{ secrets.DISCORD_REVIEWS_CHANNEL_ID }}

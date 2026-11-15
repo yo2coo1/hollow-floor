@@ -25,7 +25,7 @@ permissions: {contents: read, actions: read, issues: write}
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 240   # public repo: minutes are free; the expressive voice takes ~10-15 min per part on CPU
     env:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
       DISCORD_REVIEWS_CHANNEL_ID: ${{ secrets.DISCORD_REVIEWS_CHANNEL_ID }}
