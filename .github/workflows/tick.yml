@@ -5,6 +5,7 @@ on:
     inputs:
       dry_run: {description: "Do everything except really posting", type: boolean, default: true}
       scratch: {description: "Use a throwaway copy of the database (test run, nothing saved)", type: boolean, default: true}
+      selftest: {description: "Only render the short test clip (checks voice + renderer; nothing posted or saved)", type: boolean, default: false}
   schedule:
   # 8 runs a day at the moments that matter, not hourly (saves free minutes). Times are UTC; New York = UTC-5 (UTC-4 in summer).
     - cron: "17 9 * * *"   # 04:17 NY  votes close for 12:00 Part 1s; plan/render tomorrow's slots
@@ -63,7 +64,7 @@ jobs:
         with: {python-version: "3.12"}   # no pip cache here: light runs install nothing and the empty cache fails the job
       - name: Anything to render this run?   # standard library only, so light runs skip the big installs
         id: need
-        run: echo "render=$(python -m hollowfloor.pipeline needs-render)" >> "$GITHUB_OUTPUT"
+        run: echo "render=${{ (github.event_name == 'workflow_dispatch' && inputs.selftest) && 'true' || '' }}$(python -m hollowfloor.pipeline needs-render)" | sed 's/truetrue\|truefalse/true/' >> "$GITHUB_OUTPUT"
       - if: steps.need.outputs.render == 'true'
         uses: actions/cache@v4
         with: {path: ~/.cache/pip, key: "pip-${{ hashFiles('requirements-cloud.txt', 'requirements-voice.txt') }}"}
@@ -90,7 +91,7 @@ jobs:
       - name: Run pipeline (log kept privately in hollow-floor-data/data/logs)
         run: |
           mkdir -p data/logs; rc=0
-          python -m hollowfloor.pipeline tick ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }} > "data/logs/tick-${{ github.run_id }}.log" 2>&1 || rc=$?
+          python -m hollowfloor.pipeline ${{ (github.event_name == 'workflow_dispatch' && inputs.selftest) && 'selftest' || 'tick' }} ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }} > "data/logs/tick-${{ github.run_id }}.log" 2>&1 || rc=$?
           ls -t data/logs/*.log | tail -n +61 | xargs -r rm   # keep the last 60
           echo "pipeline exit code $rc (details: data/logs/tick-${{ github.run_id }}.log in the data repo)"; exit $rc
       - name: Encrypt new renders (a public repo's artifacts can be downloaded by anyone)

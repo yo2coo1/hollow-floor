@@ -448,6 +448,14 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "tick"
     if cmd == "needs-render":
         print("true" if needs_render(db.connect(), utcnow()) else "false"); sys.exit(0)
+    if cmd == "selftest":  # render the short test clip only (cloud check of voice + renderer; posts and saves nothing)
+        from . import build
+        build.build(ROOT / "scenes/test_hallway_voiced.json", "[tense] My boss gave me one rule for the night shift. Never open the last door. "
+                    "[pause] [scared] Tonight, I heard knocking. From the other side. [pause] Then the lights started blinking... "
+                    "[scare] [panic] And it opened!", str(ROOT / "out/selftest.mp4"))
+        probs = technical_check(ROOT / "out/selftest.mp4", min_len=8)
+        storage.stage([ROOT / "out/selftest.mp4"])  # goes through the encrypted artifact upload, so that path is tested too
+        print("selftest:", probs or "OK"); sys.exit(1 if probs else 0)
     if cmd == "weekly":
         sys.exit(0 if weekly(db.connect(), utcnow()) else 1)
     if cmd == "tick":
