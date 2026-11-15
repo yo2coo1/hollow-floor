@@ -1,0 +1,7 @@
+# direct dependencies for the Linux cloud runner (requirements.txt is the full Windows freeze)
+edge-tts==7.3.1
+kokoro-onnx==0.4.7
+faster-whisper==1.2.1
+scipy==1.18.1
+soundfile==0.14.0
+numpy==2.5.4

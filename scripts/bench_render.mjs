@@ -1,0 +1,21 @@
+// Profiles where render time goes (3D draw, overlay, JPEG encode, transfer). Usage: node scripts/bench_render.mjs scene.json [gl]
+import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import path from 'node:path';
+import puppeteer from 'puppeteer';
+const ROOT = path.resolve('.');
+const spec = JSON.parse(await readFile(process.argv[2], 'utf8'));
+const srv = createServer(async (q, r) => { try { const p = path.join(ROOT, decodeURIComponent(q.url.split('?')[0])); const b = await readFile(p);
+  r.writeHead(200, { 'Content-Type': p.endsWith('.js') ? 'text/javascript' : p.endsWith('.html') ? 'text/html' : 'application/octet-stream' }).end(b); } catch { r.writeHead(404).end(); } });
+await new Promise(r => srv.listen(0, r));
+const b = await puppeteer.launch({ headless: true, channel: 'chrome', args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', `--use-angle=${process.argv[3] || 'swiftshader'}`] });
+const page = await b.newPage();
+await page.goto(`http://127.0.0.1:${srv.address().port}/render/page.html`);
+await page.waitForFunction('window.HF_READY === true');
+await page.evaluate((s) => window.HF.load(s, 1080, 1920), spec);
+const res = await page.evaluate(() => window.HF.profile([2, 5, 8, 11, 13]));
+console.log(JSON.stringify(await page.evaluate(() => window.HF.encodeBench())));
+console.log(JSON.stringify(res));
+const t0 = Date.now(); for (let i = 0; i < 20; i++) await page.evaluate(t => window.HF.frame(t).length, 3 + i / 30);
+console.log('full frame incl. transfer:', ((Date.now() - t0) / 20).toFixed(0), 'ms');
+await b.close(); srv.close();

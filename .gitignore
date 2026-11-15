@@ -1,0 +1,32 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+private/
+*.secret
+
+# generated media (uploaded to object storage, not git)
+out/
+*.mp4
+*.wav
+*.mp3
+
+# local db during dev; the cloud copy is handled in step 7
+data/*.db
+data/*.db-journal
+
+__pycache__/
+node_modules/
+.venv/
+models/
+
+# run data lives in the private hollow-floor-data repo
+data/
+.venv-cbx/
+
+# kept out of the public code repo (stories live in the private data repo; owner notes are personal)
+stories/
+HANDOVER.md
+MORNING_REPORT.md
+SETUP_LOG.md
+YOUTUBE_AUDIT_DRAFT.md

@@ -1,0 +1,10 @@
+{
+ "name": "brand_avatar", "duration": 2, "fps": 24,
+ "room": {"w": 4, "d": 4, "h": 3, "wall": "#1a1012"},
+ "fog": {"color": "#120406", "density": 0.12},
+ "lights": {"ambient": 0.25, "moon": 0.0},
+ "props": [{"type": "bulb", "name": "b", "pos": [0, 3, 1.2], "color": "#ff3020", "intensity": 5}],
+ "characters": [{"id": "it", "kind": "shadow", "scale": 1.1, "path": [[0, 0, -0.5]], "face": [[0, 0]]}],
+ "events": [{"type": "red", "t": 0, "ramp": 0.01}],
+ "shots": [{"t": 0, "from": [0, 2.05, 1.0], "look": [0, 2.0, -0.5], "fov": 45}]
+}

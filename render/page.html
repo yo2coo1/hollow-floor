@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>@font-face { font-family: 'HF Brand'; src: url('/render/fonts/ArchivoBlack-Regular.ttf'); }</style>
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { buildScene, cameraAt, drawOverlay } from '/render/lib.js';
+
+let R, out, ctx, built, cam, spec, fx;
+
+// Film look, applied to the finished (tone-mapped) frame: contrast curve, cool shadows / warm highlights, lens fringing at the edges,
+// vignette and grain. Grain is seeded by t so every frame still renders identically in any order.
+const Cinema = {
+  uniforms: { tDiffuse: { value: null }, t: { value: 0 }, grain: { value: 0.06 }, vig: { value: 0.38 }, ca: { value: 0.0025 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float t, grain, vig, ca; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){
+      vec2 d = vUv - 0.5; float r2 = dot(d, d);
+      vec3 c = vec3(texture2D(tDiffuse, vUv + d * ca * 4.0 * r2 * 4.0).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - d * ca * 4.0 * r2 * 4.0).b);
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(l), c, 0.88);                                   // slightly muted colour
+      c = mix(c * vec3(0.93, 0.98, 1.07), c * vec3(1.06, 1.0, 0.9), smoothstep(0.05, 0.6, l));  // teal shadows, warm lights
+      c = c * c * (3.0 - 2.0 * c) * 0.25 + c * 0.75;                // gentle S-curve contrast
+      c *= 1.0 - vig * smoothstep(0.12, 0.62, r2 * 1.6);
+      c += (h(vUv * 1000.0 + fract(t * 7.13)) - 0.5) * grain;
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+};
+const draw = (t) => fx ? fx.render(t) : R.render(built.scene, cam);
+window.HF = {
+  load(s, W, H) {
+    spec = s;
+    // quality knobs (spec.quality): the 3D can be drawn at a lower internal size and scaled up; text stays full-size
+    const q = Object.assign({ aa: true, shadows: 'pcf', scale: 1 }, spec.quality || {});
+    R = new THREE.WebGLRenderer({ antialias: q.aa, preserveDrawingBuffer: true });
+    R.setSize(Math.round(W * q.scale), Math.round(H * q.scale), false);
+    R.shadowMap.enabled = q.shadows !== 'off';
+    R.shadowMap.type = q.shadows === 'basic' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+    R.toneMapping = THREE.ACESFilmicToneMapping; R.outputColorSpace = THREE.SRGBColorSpace;
+    out = Object.assign(document.createElement('canvas'), { width: W, height: H });
+    ctx = out.getContext('2d');
+    built = buildScene(spec);
+    cam = new THREE.PerspectiveCamera(50, W / H, 0.05, 100);
+    // soft fill that travels with the camera so faces always read, even when the room light is behind them
+    const fill = new THREE.PointLight('#cfd6ff', spec.camFill ?? 3.0, 7, 1.5);
+    fill.position.set(0, 0.5, 1.2);  // up and behind the lens so walls next to the camera don't blow out
+    cam.add(fill);
+    built.scene.add(cam);
+    fx = null;
+    if (q.fx !== 'off') {  // "cinema" film look as one extra pass over the normal render (cheap on CPU); "off" = the plain look
+      const w = Math.round(W * q.scale), h = Math.round(H * q.scale);
+      const tex = new THREE.FramebufferTexture(w, h);
+      const m = new THREE.ShaderMaterial({ ...Cinema, uniforms: THREE.UniformsUtils.clone(Cinema.uniforms), depthTest: false });
+      m.uniforms.tDiffuse.value = tex;
+      const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m), qs = new THREE.Scene(); qs.add(quad);
+      const qc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      R.toneMappingExposure = 1.2;  // the film grade darkens a little; lift exposure to match the old brightness
+      fx = { render(t) { R.render(built.scene, cam); R.copyFramebufferToTexture(tex); m.uniforms.t.value = t; R.render(qs, qc); } };
+    }
+    return true;
+  },
+  // returns base64 JPEG (without the data: prefix). mode 'thumb' draws the thumbnail text instead of captions/cards
+  setThumb(th) { spec.thumb = th; },
+  async encodeBench() {
+    const r = {}, time = async (k, f) => { const a = performance.now(); for (let i = 0; i < 4; i++) await f(); r[k] = Math.round((performance.now() - a) / 4); };
+    await time('dataurl_jpeg92', () => out.toDataURL('image/jpeg', 0.92));
+    await time('dataurl_jpeg80', () => out.toDataURL('image/jpeg', 0.8));
+    await time('blob_jpeg92', () => new Promise(res => out.toBlob(res, 'image/jpeg', 0.92)));
+    await time('blob_webp', () => new Promise(res => out.toBlob(res, 'image/webp', 0.9)));
+    await time('getImageData', () => ctx.getImageData(0, 0, out.width, out.height));
+    return r;
+  },
+  // timing breakdown in ms for a few sample times (used by scripts/bench_render.mjs)
+  profile(ts) {
+    const r = { update: 0, render: 0, overlay: 0, encode: 0 }, n = ts.length;
+    for (const t of ts) {
+      let a = performance.now(); built.update(t); cameraAt(cam, spec.shots, t, spec.duration); r.update += performance.now() - a;
+      a = performance.now(); draw(t); R.getContext().finish(); r.render += performance.now() - a;
+      a = performance.now(); ctx.drawImage(R.domElement, 0, 0, out.width, out.height); drawOverlay(ctx, spec, t, out.width, out.height); r.overlay += performance.now() - a;
+      a = performance.now(); out.toDataURL('image/jpeg', 0.92); r.encode += performance.now() - a;
+    }
+    for (const k in r) r[k] = Math.round(r[k] / n);
+    return r;
+  },
+  frame(t, mode) {
+    built.update(t);
+    const shot = cameraAt(cam, spec.shots, t, spec.duration);
+    draw(t);
+    ctx.drawImage(R.domElement, 0, 0, out.width, out.height);
+    drawOverlay(ctx, spec, t, out.width, out.height, mode);
+    return out.toDataURL('image/jpeg', 0.92).slice(23);
+  },
+};
+document.fonts.load("84px 'HF Brand'").then(() => { window.HF_READY = true; });  // brand font bundled so the cloud renders identically
+</script>

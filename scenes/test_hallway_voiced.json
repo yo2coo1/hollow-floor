@@ -1,0 +1,357 @@
+{
+ "name": "test_hallway_voiced",
+ "duration": "end+1.6",
+ "fps": 30,
+ "room": {
+  "w": 3,
+  "d": 12,
+  "h": 3,
+  "wall": "#343846"
+ },
+ "fog": {
+  "color": "#07070c",
+  "density": 0.07
+ },
+ "lights": {
+  "ambient": 0.7,
+  "moon": 0.2
+ },
+ "props": [
+  {
+   "type": "door",
+   "pos": [
+    0,
+    0,
+    -5.9
+   ],
+   "open": [
+    [
+     0,
+     0
+    ],
+    [
+     "scare1-1.4",
+     0
+    ],
+    [
+     "scare1-0.3",
+     75
+    ]
+   ]
+  },
+  {
+   "type": "bulb",
+   "name": "near",
+   "pos": [
+    0,
+    3,
+    1.5
+   ],
+   "intensity": 14,
+   "shadow": true
+  },
+  {
+   "type": "bulb",
+   "name": "far",
+   "pos": [
+    0,
+    3,
+    -4.9
+   ],
+   "intensity": 12
+  },
+  {
+   "type": "crate",
+   "pos": [
+    -1.0,
+    0,
+    0.5
+   ]
+  },
+  {
+   "type": "crate",
+   "pos": [
+    -1.05,
+    0.6,
+    0.45
+   ],
+   "size": 0.45
+  },
+  {
+   "type": "chair",
+   "pos": [
+    1.0,
+    0,
+    3.2
+   ],
+   "rot": -30
+  }
+ ],
+ "characters": [
+  {
+   "id": "guard",
+   "color": "#2f6fdf",
+   "path": [
+    [
+     0,
+     0,
+     4
+    ],
+    [
+     6,
+     0,
+     -4.2
+    ]
+   ],
+   "pose": [
+    [
+     0,
+     "walk"
+    ],
+    [
+     6,
+     "idle"
+    ],
+    [
+     "scare1+0.1",
+     "panic"
+    ]
+   ],
+   "look": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     "w:knocking",
+     0,
+     0
+    ],
+    [
+     "w:knocking+0.5",
+     -25,
+     0
+    ],
+    [
+     "w:side+0.6",
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "thing",
+   "kind": "shadow",
+   "scale": 1.15,
+   "path": [
+    [
+     0,
+     0.15,
+     -5.75
+    ]
+   ],
+   "face": [
+    [
+     0,
+     0
+    ]
+   ],
+   "visible": [
+    [
+     0,
+     0
+    ],
+    [
+     "scare1-1.0",
+     1
+    ]
+   ]
+  }
+ ],
+ "events": [
+  {
+   "type": "flicker",
+   "target": "far",
+   "t": "w:lights-0.3",
+   "until": "scare1"
+  },
+  {
+   "type": "red",
+   "t": "scare1",
+   "ramp": 0.1
+  },
+  {
+   "type": "flash",
+   "t": "scare1"
+  }
+ ],
+ "audio": [
+  {
+   "type": "footsteps",
+   "t": 0.3,
+   "until": 6,
+   "every": 0.5
+  },
+  {
+   "type": "knock",
+   "t": "w:side+0.5",
+   "gain": 0.4
+  },
+  {
+   "type": "buzz",
+   "t": "w:lights-0.3",
+   "until": "scare1",
+   "gain": 0.12
+  },
+  {
+   "type": "creak",
+   "t": "scare1-1.4",
+   "gain": 0.3
+  },
+  {
+   "type": "hit",
+   "t": "scare1",
+   "gain": 0.8
+  }
+ ],
+ "shots": [
+  {
+   "t": 0,
+   "from": [
+    0.9,
+    2.3,
+    5.8
+   ],
+   "to": [
+    0.7,
+    2.2,
+    5.0
+   ],
+   "look": [
+    0,
+    1.2,
+    -5
+   ]
+  },
+  {
+   "t": 3,
+   "from": [
+    -0.6,
+    1.1,
+    -5.3
+   ],
+   "to": [
+    -0.5,
+    1.15,
+    -5.2
+   ],
+   "look": [
+    0,
+    1.5,
+    0
+   ],
+   "lookTo": [
+    0,
+    1.6,
+    -3.5
+   ],
+   "fov": 50
+  },
+  {
+   "t": 5.2,
+   "from": [
+    0.9,
+    1.6,
+    -2.4
+   ],
+   "to": [
+    0.7,
+    1.6,
+    -3.6
+   ],
+   "look": [
+    -0.1,
+    1.2,
+    -5.9
+   ],
+   "fov": 45
+  },
+  {
+   "t": "w:knocking",
+   "from": [
+    -0.9,
+    1.7,
+    -3.0
+   ],
+   "to": [
+    -0.8,
+    1.7,
+    -3.3
+   ],
+   "look": [
+    0,
+    1.7,
+    -4.4
+   ],
+   "fov": 45
+  },
+  {
+   "t": "w:lights-0.3",
+   "from": [
+    0.25,
+    1.8,
+    -5.3
+   ],
+   "look": [
+    0,
+    1.8,
+    -4.2
+   ],
+   "fov": 55
+  },
+  {
+   "t": "scare1",
+   "from": [
+    1.1,
+    1.7,
+    -2.6
+   ],
+   "to": [
+    1.0,
+    1.7,
+    -3.0
+   ],
+   "look": [
+    0.15,
+    1.7,
+    -5.75
+   ],
+   "shake": 0.14,
+   "fov": 42
+  },
+  {
+   "t": "scare1+1.2",
+   "from": [
+    0.6,
+    0.9,
+    -4.7
+   ],
+   "look": [
+    0.15,
+    1.9,
+    -5.75
+   ],
+   "shake": 0.06,
+   "fov": 50
+  }
+ ],
+ "title": {
+  "text": "Never open the last door",
+  "until": 1.4
+ },
+ "endCard": {
+  "text": "Follow for\nPart 2",
+  "from": "end"
+ }
+}

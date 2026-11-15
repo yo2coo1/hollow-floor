@@ -1,0 +1,80 @@
+# Non-secret settings. Secrets live in .env (local) or GitHub secrets (cloud).
+
+[channel]
+name = "Hollow Floor"
+handle = "hollowfloorstories"   # owner choice 2026-11-14: @hollowfloor is taken on Instagram
+bio = "New scary stories every day. Part 2 drops the next day."
+genre = "scary/suspense"
+story_types = ["haunted places", "strange neighbors", "unexplained messages", "night shifts", "empty buildings", "things that should not be there"]
+
+[schedule]
+stories_per_cycle = 3          # 3 Part 1s one day, 3 Part 2s the next
+part2_delay_hours = [12, 24]
+post_times_local = ["12:00", "17:00", "21:00"]   # adjusted from analytics in month 1
+timezone = "America/New_York"  # TODO confirm with owner
+review_period_days = 14
+review_reminder_hours = 12
+
+[video]
+width = 1080
+height = 1920
+fps = 30
+min_seconds = 45
+max_seconds = 60
+words_min = 120
+words_max = 150
+
+[voice]
+engine = "chatterbox"   # owner 2026-11-15: expressive delivery that follows the story's mood tags (was "kokoro": flat, fast)
+voice_id = "am_liam"     # owner 2026-11-15: a young man, not the deep voice (Chatterbox copies this Kokoro voice)
+rate = "-8%"
+pitch = "-4Hz"
+
+# Character voices for dialogue tags in scripts: "{mom: Come downstairs.}". Local Kokoro voices, free, no account.
+# speed < 1 = slower, pitch < 1 = deeper (applied after synthesis). Untagged lines are the main character's thoughts
+# in voice_id above (owner 2026-11-15: no narrator). "label" = the name shown on captions (default: the role in capitals).
+[voice.roles]
+me          = { voice = "am_liam",    speed = 0.92, pitch = 1.0,  label = "ME" }
+mom         = { voice = "af_sarah",   speed = 0.92, pitch = 1.0 }
+woman       = { voice = "af_nicole",  speed = 0.9,  pitch = 1.0 }
+sister      = { voice = "af_bella",   speed = 0.95, pitch = 1.0 }
+grandma     = { voice = "bf_emma",    speed = 0.82, pitch = 0.94 }
+old_woman   = { voice = "bf_emma",    speed = 0.82, pitch = 0.94 }
+dad         = { voice = "am_adam",    speed = 0.92, pitch = 0.97 }
+man         = { voice = "am_eric",    speed = 0.9,  pitch = 0.96 }
+brother     = { voice = "am_liam",    speed = 0.95, pitch = 1.0 }
+grandpa     = { voice = "bm_george",  speed = 0.82, pitch = 0.92 }
+old_man     = { voice = "bm_george",  speed = 0.82, pitch = 0.92 }
+manager     = { voice = "bm_lewis",   speed = 0.92, pitch = 0.97 }
+caller      = { voice = "am_echo",    speed = 0.85, pitch = 0.95 }
+neighbor    = { voice = "am_puck",    speed = 0.9,  pitch = 0.96 }
+officer     = { voice = "bm_daniel",  speed = 0.95, pitch = 0.98 }
+speaker     = { voice = "af_alloy",   speed = 1.0,  pitch = 1.0,  label = "SPEAKER" }
+thing       = { voice = "am_onyx",    speed = 0.8,  pitch = 0.8,  label = "???" }
+whisper     = { voice = "af_nicole",  speed = 0.8,  pitch = 0.9,  label = "???" }
+double      = { voice = "am_liam",    speed = 0.85, pitch = 0.88, label = "ME?" }
+
+[posting]
+max_retries = 3
+platforms = ["youtube", "tiktok", "instagram"]
+ai_label = true    # never turn off
+youtube_privacy = "private"   # YouTube forces "private" for API uploads until the API audit is approved; then set "public"
+tiktok_private = true          # same for TikTok until its app audit
+
+[paths]
+db = "data/hollowfloor.db"
+out = "out"
+
+[votes]
+# Owner idea 2026-11-14: Part 1 ends on two choices, viewers vote in comments, Part 2 follows the majority.
+enabled = true
+min_votes = 5             # fewer than this -> writer's default branch (a new channel gets few comments)
+close_after_hours = 16    # count votes 16 h after Part 1 posts, leaving ~8 h to render, review and post Part 2 at 24 h
+count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
+
+[render]
+# 3D is drawn at this fraction of 1080x1920, then scaled up; text is always full resolution.
+# Measured on CPU: 1.0 = 292 ms/frame, 0.75 = 128 ms/frame (near-identical look), 0.6 = 99 ms/frame (slightly softer).
+scale = 0.75
+shadows = "basic"   # "pcf" = softer shadow edges, ~2x slower on CPU
+fps = 24
