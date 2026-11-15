@@ -60,10 +60,13 @@ jobs:
           echo "HF_MAX_RENDERS=1" >> "$GITHUB_ENV"
           echo "HF_TEST_LABEL=TEST RUN - nothing will be posted, no need to react" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12", cache: pip, cache-dependency-path: "requirements-cloud.txt\nrequirements-voice.txt"}
+        with: {python-version: "3.12"}   # no pip cache here: light runs install nothing and the empty cache fails the job
       - name: Anything to render this run?   # standard library only, so light runs skip the big installs
         id: need
         run: echo "render=$(python -m hollowfloor.pipeline needs-render)" >> "$GITHUB_OUTPUT"
+      - if: steps.need.outputs.render == 'true'
+        uses: actions/cache@v4
+        with: {path: ~/.cache/pip, key: "pip-${{ hashFiles('requirements-cloud.txt', 'requirements-voice.txt') }}"}
       - if: steps.need.outputs.render == 'true'
         run: pip install -r requirements-cloud.txt
       # --- heavy tools only when a video must be rendered ---

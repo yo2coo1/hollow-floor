@@ -62,9 +62,8 @@ def ensure(rel_path, artifact):
     list them but not watch them. Renders made before the repo went public are kept in the private data repo."""
     p = ROOT / rel_path
     kept = ROOT / "data" / "renders" / Path(rel_path).relative_to("out")
-    if not p.exists() and kept.exists():
-        p.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(kept, p)
+    if not p.exists() and kept.exists():  # bring the whole story folder: posting also needs the thumbnails next to the video
+        shutil.copytree(kept.parent, p.parent, dirs_exist_ok=True)
     if p.exists() or not artifact:
         return p
     repo, token = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"]

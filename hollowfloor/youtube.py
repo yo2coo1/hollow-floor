@@ -132,8 +132,8 @@ def upload(path, title, description, tags, privacy="private", publish_at=None, t
                 req = urllib.request.Request(UPLOAD + "/thumbnails/set?videoId=" + vid, data=f.read(), method="POST",
                                              headers={"Authorization": f"Bearer {token}", "Content-Type": "image/jpeg"})
             urllib.request.urlopen(req, timeout=60).read()
-        except urllib.error.HTTPError as e:  # custom thumbnails need a verified channel; a missing thumbnail must not fail the post
-            log.warning("thumbnail not set for %s: HTTP %s", vid, e.code)
+        except Exception as e:  # the video is already up: any thumbnail problem must not fail (and re-upload) the post
+            log.warning("thumbnail not set for %s: %s", vid, getattr(e, "code", e))
     return vid
 
 
