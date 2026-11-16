@@ -15,7 +15,7 @@ PART1_VOTE = ["Comment {A} or {B}.", "{A} or {B}? Tell me below.", "What would y
 PART2_FOLLOW = [
     "Part 1 is on my page. Follow for tomorrow's new story.",
     "Missed Part 1? It's on my page. New story tomorrow.",
-    "New scary story every day. Follow for the next one.",
+    "Start with Part 1 on my page. New story every day.",
 ]
 
 
