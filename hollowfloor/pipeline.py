@@ -225,6 +225,8 @@ def step_post(con, now, dry_run=False):
     rows = con.execute("SELECT p.*, v.file_path, v.thumbnail_path, v.story_id, v.part, v.artifact FROM posts p JOIN videos v ON v.id=p.video_id "
                        "WHERE p.status='queued' AND v.status='approved' AND p.scheduled_at <= ? ORDER BY p.scheduled_at", (iso(now),)).fetchall()
     for p in rows:
+        if p["platform"] == "youtube" and P.get("youtube_privacy") == "hand":
+            continue  # posted publicly by hand in YouTube Studio from the owner's PC (scripts/hand_post.py); see step_hand_posted
         ready, why = platform_ready(con, p["platform"])
         if not ready:
             con.execute("UPDATE posts SET status='blocked', error=? WHERE id=?", (why, p["id"])); con.commit(); continue
@@ -268,6 +270,23 @@ def step_post(con, now, dry_run=False):
     for (sid,) in con.execute("SELECT DISTINCT v.story_id FROM posts p JOIN videos v ON v.id=p.video_id WHERE p.status='posted' AND v.part=1").fetchall():
         if con.execute("SELECT status FROM stories WHERE id=?", (sid,)).fetchone()[0] == "scheduled":
             db.set_story_status(con, sid, "posted")
+
+
+def step_hand_posted(con, root=None):
+    """Import posts made by hand in YouTube Studio: the owner's PC drops data/hand_posted/<post id>.json into the data repo
+    (new small files never conflict with this run's database push), this run copies them into the database and removes them."""
+    for f in sorted(((root or ROOT) / "data" / "hand_posted").glob("*.json")):
+        h = json.loads(f.read_text(encoding="utf-8"))
+        con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, platform_post_id=?, attempts=attempts+1, error=NULL WHERE id=? AND status!='posted'",
+                    (h["posted_at"], h["url"], h["url"].rsplit("/", 1)[-1], int(h["post_id"])))
+        if not db.kv_get(con, "first_post_at"):
+            db.kv_set(con, "first_post_at", h["posted_at"])
+        sid = con.execute("SELECT v.story_id FROM posts p JOIN videos v ON v.id=p.video_id WHERE p.id=? AND v.part=1", (int(h["post_id"]),)).fetchone()
+        if sid and con.execute("SELECT status FROM stories WHERE id=?", (sid[0],)).fetchone()[0] == "scheduled":
+            db.set_story_status(con, sid[0], "posted")
+        con.commit()
+        f.unlink()
+        log.info("hand post %s imported: %s", h["post_id"], h["url"])
 
 
 def _part1_link(con, p):
@@ -428,7 +447,7 @@ def tick(dry_run=False, write=True):
     run_id = db.start_run(con)
     now = utcnow()
     done, ok = [], True
-    for name, fn in [("tokens", lambda: step_tokens(con, now)), ("reviews", lambda: step_reviews(con, now)), ("inbox", lambda: step_inbox(con)), ("plan", lambda: step_plan_part1(con, now, write)),
+    for name, fn in [("tokens", lambda: step_tokens(con, now)), ("reviews", lambda: step_reviews(con, now)), ("hand", lambda: step_hand_posted(con)), ("inbox", lambda: step_inbox(con)), ("plan", lambda: step_plan_part1(con, now, write)),
                      ("votes", lambda: step_votes(con, now)), ("post", lambda: step_post(con, now, dry_run)),
                      ("metrics", lambda: __import__("hollowfloor.analytics", fromlist=["x"]).step_metrics(con, now)),
                      ("autopilot", lambda: autopilot_notice(con, now)), ("summary", lambda: step_daily_summary(con, now))]:

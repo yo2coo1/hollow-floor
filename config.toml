@@ -58,7 +58,7 @@ double      = { voice = "am_liam",    speed = 0.85, pitch = 0.88, label = "ME?" 
 max_retries = 3
 platforms = ["youtube", "tiktok", "instagram"]
 ai_label = true    # never turn off
-youtube_privacy = "private"   # YouTube forces "private" for API uploads until the API audit is approved; then set "public"
+youtube_privacy = "hand"      # "hand" = the cloud leaves YouTube posts queued and the owner's PC posts them publicly in YouTube Studio (API uploads are forced private until the API audit is approved; then set "public")
 tiktok_private = true          # same for TikTok until its app audit
 
 [paths]
