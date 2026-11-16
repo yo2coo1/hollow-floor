@@ -282,11 +282,14 @@ def step_hand_posted(con, root=None):
         if "platform" in h:  # Instagram/TikTok Reel posted by hand (found by story + part)
             r = con.execute("SELECT p.id FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=? AND p.platform=?",
                             (h["story"], h["part"], h["platform"])).fetchone()
+            url = h.get("url") or f"{h['platform']}://hand/{h['story']}-{h['part']}"
+            vid = con.execute("SELECT id FROM videos WHERE story_id=? AND part=?", (h["story"], h["part"])).fetchone()
             if r:
-                con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, error=NULL WHERE id=? AND status!='posted'",
-                            (h["posted_at"], h.get("url") or f"{h['platform']}://hand/{h['story']}-{h['part']}", r[0]))
+                con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, error=NULL WHERE id=? AND status!='posted'", (h["posted_at"], url, r[0]))
+            elif vid:  # stories made before Instagram/TikTok existed have only a YouTube row: add the missing one
+                con.execute("INSERT INTO posts (video_id, platform, posted_at, url, status) VALUES (?,?,?,?, 'posted')", (vid[0], h["platform"], h["posted_at"], url))
             else:
-                log.warning("hand post %s: no %s post row for story %s part %s", f.name, h["platform"], h["story"], h["part"])
+                log.warning("hand post %s: no video for story %s part %s", f.name, h["story"], h["part"])
             con.commit(); f.unlink(); continue
         con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, platform_post_id=?, attempts=attempts+1, error=NULL WHERE id=? AND status!='posted'",
                     (h["posted_at"], h["url"], h["url"].rsplit("/", 1)[-1], int(h["post_id"])))

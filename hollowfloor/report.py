@@ -99,12 +99,19 @@ def collect(con, now, tz, live=True):
             r = st.get(pf)
             if r and r["status"] == "posted":
                 cells[pf] = ("ok", "posted")
-            elif pf != "youtube" and v["part"] == 1 and v["story_id"] > 10:
-                cells[pf] = ("na", f"cloud posts here from {APIS_DAY:%b %d}")  # new Part 1s are YouTube-only until the APIs
             else:
                 cells[pf] = ("wait", "in the PC queue" if pf != "youtube" else (r["status"] if r else "not queued"))
         match.append({"story": v["story_id"], "part": v["part"], "cells": cells,
                       "ok": all(c[0] in ("ok", "na") for c in cells.values())})
+    # how well each recent video held viewers (YouTube Analytics, stored by analytics.step_metrics at 24 h / 72 h; latest wins)
+    held = {}
+    for r in con.execute("SELECT v.story_id, v.part, s.title, m.kind, m.raw FROM metrics m JOIN posts p ON p.id=m.post_id JOIN videos v ON v.id=p.video_id "
+                         "JOIN stories s ON s.id=v.story_id WHERE p.platform='youtube' AND p.posted_at >= ? ORDER BY m.id",
+                         ((now - timedelta(days=7)).isoformat(timespec="seconds"),)):
+        raw = json.loads(r["raw"] or "{}")
+        if raw.get("avg_view_pct") is not None:
+            held[(r["story_id"], r["part"])] = {"story": r["story_id"], "part": r["part"], "title": (r["title"] or "").replace(" (Part 1)", ""),
+                                                "pct": float(raw["avg_view_pct"]), "views": raw.get("views"), "kind": r["kind"]}
     stats, comments, subs, subs_box, problems = {}, {}, None, [], []
     if live:
         from . import youtube
@@ -131,7 +138,7 @@ def collect(con, now, tz, live=True):
                            "WHERE p.status IN ('queued','blocked') AND p.platform='youtube' AND p.scheduled_at BETWEEN ? AND ? GROUP BY v.id ORDER BY at",
                            (now.isoformat(timespec="seconds"), (now + timedelta(hours=24)).isoformat(timespec="seconds"))).fetchall()
     return dict(date=now.astimezone(tz).date(), today=list(today.values()), match=match, stats=stats, comments=comments, subs=subs, money=money,
-                votes=votes, review=[tuple(r) for r in review], late=[tuple(r) for r in late], errors=errors, failed_runs=failed_runs,
+                held=sorted(held.values(), key=lambda x: -x["pct"]), votes=votes, review=[tuple(r) for r in review], late=[tuple(r) for r in late], errors=errors, failed_runs=failed_runs,
                 upcoming=[(r["story_id"], r["part"], r["at"], r["status"]) for r in upcoming],
                 audit_pending=CONFIG["posting"].get("youtube_privacy") == "hand", days_to_apis=(APIS_DAY - now.astimezone(tz).date()).days)
 
@@ -169,6 +176,11 @@ def render_html(d, tz):
                  "".join(f"<td title='{_e(m['cells'][p][1])}'>{mark[m['cells'][p][0]]} <span class=meta>{_e(m['cells'][p][1])}</span></td>" for p in PLATFORMS) +
                  f"<td>{'match' if m['ok'] else 'catching up'}</td></tr>")
     h.append("</table>" + ("" if d["match"] else "<p>No posts in the last 3 days.</p>"))
+    if d.get("held"):
+        h.append("<h2>How well videos held viewers (last 7 days)</h2><table><tr><th>Video</th><th>Average watched</th><th>Views</th></tr>" + "".join(
+            f"<tr><td>Story {x['story']} · Part {x['part']} — {_e(x['title'])}</td><td>{x['pct']:.0f}%</td><td>{_e(x['views'] if x['views'] is not None else '–')}"
+            f" <span class=meta>({x['kind']})</span></td></tr>" for x in d["held"]) + "</table>"
+            "<p class=note>Best first. Over 100% means people rewatch. Look at what the top stories share (setting, look, pacing, twist).</p>")
     if d["votes"]:
         h.append("<h2>Votes closed today</h2><ul>" + "".join(
             f"<li>Story {v['story']} ({_e(v['title'])}): {v['counts'].get('A', 0)}–{v['counts'].get('B', 0)} → Part 2 {v['winner']}</li>" for v in d["votes"]) + "</ul>")

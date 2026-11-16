@@ -23,5 +23,9 @@ assert tuple(con.execute("SELECT status, platform_post_id FROM posts WHERE id=7"
 assert con.execute("SELECT status FROM stories WHERE id=1").fetchone()[0] == "posted"
 assert db.kv_get(con, "first_post_at") == "2026-01-01T00:05:00+00:00"
 assert not list((root / "data" / "hand_posted").glob("*.json"))
+# an Instagram Reel of a story that has no Instagram row yet (made before Instagram existed) gets one
+(root / "data" / "hand_posted" / "instagram-1-1.json").write_text(json.dumps({"platform": "instagram", "story": 1, "part": 1, "url": None, "posted_at": "2026-01-02T00:00:00+00:00"}))
+pipeline.step_hand_posted(con, root)
+assert con.execute("SELECT status FROM posts WHERE platform='instagram' AND video_id=1").fetchone()[0] == "posted"
 shutil.rmtree(root)
 print("hand-posted self-check: OK")
