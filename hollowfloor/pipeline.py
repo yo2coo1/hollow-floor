@@ -274,11 +274,31 @@ def step_post(con, now, dry_run=False):
             db.set_story_status(con, sid, "posted")
 
 
+def apply_vote_override(con, sid, winner, counts=None):
+    """Owner-approved vote from the PC. If it changes an ending whose Part 2 isn't posted anywhere yet, drop that Part 2
+    so step_votes renders the chosen one; once any Part 2 is live, the ending can't change."""
+    assert winner in ("A", "B")
+    row = con.execute("SELECT winning_choice FROM stories WHERE id=?", (sid,)).fetchone()
+    p2 = con.execute("SELECT id FROM videos WHERE story_id=? AND part=2", (sid,)).fetchone()
+    if p2 and con.execute("SELECT 1 FROM posts WHERE video_id=? AND status='posted'", (p2[0],)).fetchone():
+        log.warning("vote override for story %s ignored: Part 2 is already posted", sid); return
+    db.kv_set(con, f"vote_override_{sid}", json.dumps({"winner": winner, "counts": counts}))
+    if row and row[0] and row[0] != winner:
+        if p2:
+            con.execute("DELETE FROM metrics WHERE post_id IN (SELECT id FROM posts WHERE video_id=?)", (p2[0],))
+            con.execute("DELETE FROM posts WHERE video_id=?", (p2[0],))
+            con.execute("DELETE FROM videos WHERE id=?", (p2[0],))
+        con.execute("UPDATE stories SET winning_choice=NULL WHERE id=?", (sid,))
+
+
 def step_hand_posted(con, root=None):
     """Import posts made by hand in YouTube Studio: the owner's PC drops data/hand_posted/<post id>.json into the data repo
     (new small files never conflict with this run's database push), this run copies them into the database and removes them."""
     for f in sorted(((root or ROOT) / "data" / "hand_posted").glob("*.json")):
         h = json.loads(f.read_text(encoding="utf-8"))
+        if "vote" in h:  # Part 2 choice counted on the PC (Instagram/TikTok comments read in Chrome)
+            apply_vote_override(con, h["story"], h["vote"], h.get("counts"))
+            con.commit(); f.unlink(); continue
         if "platform" in h:  # Instagram/TikTok Reel posted by hand (found by story + part)
             r = con.execute("SELECT p.id FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=? AND p.platform=?",
                             (h["story"], h["part"], h["platform"])).fetchone()
@@ -338,6 +358,10 @@ def step_votes(con, now, comment_fetch=None):
             continue  # couldn't read the YouTube votes: try again next run instead of silently picking the default ending
         counts = votes.tally(comments, s["choices"]["A"]["label"], s["choices"]["B"]["label"])
         winner, why = votes.decide(counts, s["choices"]["default"], V["min_votes"])
+        forced = db.kv_get(con, f"vote_override_{sid}")
+        if forced:  # counted on the PC (scripts/hand_post.py vote)
+            forced = json.loads(forced); winner, why = forced["winner"], f"PC count {forced.get('counts')} picked {forced['winner']}"
+            counts["pc"] = forced.get("counts")
         con.execute("UPDATE stories SET winning_choice=?, vote_counts=? WHERE id=?", (winner, json.dumps(counts), sid)); con.commit()
         log.info("story %s vote: %s (%s)", sid, winner, why)
         key = f"part2{winner}"

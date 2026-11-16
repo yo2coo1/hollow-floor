@@ -155,6 +155,17 @@ def mark(data, platform, story, part, url=""):
     print("recorded", platform, story, part)
 
 
+def vote(data, story, winner, counts=""):
+    """Part 2 ending counted on the PC (e.g. Instagram comments read in Chrome): the cloud re-renders Part 2 if it changes."""
+    assert winner in ("A", "B"), "usage: vote <data> <story> <A|B> [counts note]"
+    f = Path(data) / "data" / "hand_posted" / f"vote-{int(story)}.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"vote": winner, "story": int(story), "counts": counts or None}), encoding="utf-8")
+    if not _push(data, f, f"vote story {story}: {winner}"):
+        sys.exit("push failed: the marker is committed locally; run `git push` in the data clone")
+    print("recorded vote", story, winner)
+
+
 if __name__ == "__main__":
     cmd, data = sys.argv[1], Path(sys.argv[2])
-    {"due": lambda: due(data), "done": lambda: done(data, *sys.argv[3:5]), "mark": lambda: mark(data, *sys.argv[3:7])}[cmd]()
+    {"due": lambda: due(data), "done": lambda: done(data, *sys.argv[3:5]), "mark": lambda: mark(data, *sys.argv[3:7]), "vote": lambda: vote(data, *sys.argv[3:6])}[cmd]()

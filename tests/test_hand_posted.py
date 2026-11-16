@@ -27,5 +27,14 @@ assert not list((root / "data" / "hand_posted").glob("*.json"))
 (root / "data" / "hand_posted" / "instagram-1-1.json").write_text(json.dumps({"platform": "instagram", "story": 1, "part": 1, "url": None, "posted_at": "2026-01-02T00:00:00+00:00"}))
 pipeline.step_hand_posted(con, root)
 assert con.execute("SELECT status FROM posts WHERE platform='instagram' AND video_id=1").fetchone()[0] == "posted"
+# a PC vote that changes an unposted Part 2's ending drops that Part 2 so step_votes renders the chosen one
+con.execute("UPDATE stories SET winning_choice='A' WHERE id=1")
+con.execute("INSERT INTO videos (id, story_id, part, branch, file_path, status) VALUES (2, 1, 2, 'A', 'out/y.mp4', 'approved')")
+con.execute("INSERT INTO posts (id, video_id, platform, status) VALUES (20, 2, 'youtube', 'queued')"); con.commit()
+(root / "data" / "hand_posted" / "vote-1.json").write_text(json.dumps({"vote": "B", "story": 1, "counts": "instagram 3-0"}))
+pipeline.step_hand_posted(con, root)
+assert con.execute("SELECT winning_choice FROM stories WHERE id=1").fetchone()[0] is None
+assert not con.execute("SELECT 1 FROM videos WHERE id=2").fetchone() and not con.execute("SELECT 1 FROM posts WHERE id=20").fetchone()
+assert json.loads(db.kv_get(con, "vote_override_1"))["winner"] == "B"
 shutil.rmtree(root)
 print("hand-posted self-check: OK")
