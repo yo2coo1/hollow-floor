@@ -150,6 +150,8 @@ def technical_check(path, min_len=20):
 def step_plan_part1(con, now, write=True):
     """Fill upcoming Part 1 slots: pick ready stories (or write new ones), render Part 1, create posts, send review."""
     from . import writer
+    if S.get("hold_new_part1"):
+        log.info("new Part 1s on hold (config schedule.hold_new_part1)"); return
     free = [t for t in next_part1_slots(con, now) if iso(t) not in taken_slots(con)]
     # at most N renders per run (each takes ~15 min on a free cloud machine); the rest happen on the next run
     for slot in free[:int(os.environ.get("HF_MAX_RENDERS", "2"))]:
@@ -429,7 +431,7 @@ def weekly(con, now):
 
 def needs_render(con, now):
     """Cheap check the workflow runs first, so the heavy render tools are only installed when needed."""
-    if [t for t in next_part1_slots(con, now) if iso(t) not in taken_slots(con)]:
+    if not S.get("hold_new_part1") and [t for t in next_part1_slots(con, now) if iso(t) not in taken_slots(con)]:
         return True
     for r in con.execute("SELECT MIN(p.posted_at) FROM stories s JOIN videos v ON v.story_id=s.id AND v.part=1 JOIN posts p ON p.video_id=v.id "
                          "AND p.status='posted' WHERE s.winning_choice IS NULL GROUP BY s.id"):

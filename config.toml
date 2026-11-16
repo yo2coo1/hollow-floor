@@ -14,6 +14,7 @@ post_times_local = ["12:00", "17:00", "21:00"]   # adjusted from analytics in mo
 timezone = "America/New_York"  # TODO confirm with owner
 review_period_days = 14
 review_reminder_hours = 12
+hold_new_part1 = true          # owner 2026-11-16: no new Part 1s until stories 11+ are rewritten longer (62-75 s) with their own look; votes/Part 2s/posting keep running
 
 [video]
 width = 1080
