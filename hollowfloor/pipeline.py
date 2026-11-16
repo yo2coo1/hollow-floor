@@ -339,7 +339,7 @@ def step_votes(con, now, comment_fetch=None):
         log.info("story %s vote: %s (%s)", sid, winner, why)
         key = f"part2{winner}"
         vid = render_part(con, sid, s, key)
-        when = first + timedelta(hours=24)
+        when = first + timedelta(hours=V.get("part2_after_hours", 24))
         queue_posts(con, sid, s, key, vid, when)
         send_for_review(con, vid, sid, s, key, when, now)
         discord.alert(f"🗳️ Story {sid} vote closed: {why}. Part 2 ({s['choices'][winner]['label']}) is rendered and scheduled.")

@@ -70,7 +70,8 @@ out = "out"
 # Owner idea 2026-11-14: Part 1 ends on two choices, viewers vote in comments, Part 2 follows the majority.
 enabled = true
 min_votes = 5             # fewer than this -> writer's default branch (a new channel gets few comments)
-close_after_hours = 16    # count votes 16 h after Part 1 posts, leaving ~8 h to render, review and post Part 2 at 24 h
+close_after_hours = 13    # TEMPORARY 2026-11-16 (owner: all Part 2s at noon); normal is 16
+part2_after_hours = 15    # TEMPORARY 2026-11-16; normal is 24 (Part 2 posts 24 h after Part 1)
 count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
 
 # Each story picks its own look, camera style and pacing (story["style"]); the variety gate stops repeats.
