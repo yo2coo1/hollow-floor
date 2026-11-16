@@ -186,7 +186,7 @@ def send_for_review(con, vid, sid, s, key, when, now):
     v = con.execute("SELECT * FROM videos WHERE id=?", (vid,)).fetchone()
     if v["status"] != "rendered":
         return
-    if not in_review_period(con, now):
+    if not in_review_period(con, now) or v["part"] == 2:  # owner reviews Part 1s only (2026-11-16)
         con.execute("UPDATE videos SET status='approved' WHERE id=?", (vid,)); con.commit(); return
     yt, tt = metadata.post_text(s, key, "youtube", sid), metadata.post_text(s, key, "tiktok", sid)
     lines = f"**YouTube / Instagram (A/B {yt['variant']}):** {yt['title']}\n**TikTok ({tt['variant']}):** {tt['title']}"

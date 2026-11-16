@@ -39,6 +39,7 @@ an.step_metrics = lambda con, now: None
 T = datetime(2026, 12, 1, 13, 0, tzinfo=timezone.utc)  # 08:00 New York
 clock = {"now": T}
 pipeline.utcnow = lambda: clock["now"]
+pipeline.P["youtube_privacy"] = "public"  # this test covers cloud posting, not the hand-posting stopgap
 con = db.connect()
 q = lambda sql, *a: con.execute(sql, a).fetchall()
 
@@ -69,7 +70,7 @@ assert pipeline.tick(dry_run=True) and q("SELECT COUNT(*) FROM posts WHERE statu
 state["paused"] = False
 assert pipeline.tick(dry_run=True) and q("SELECT COUNT(*) FROM posts WHERE status='posted'")[0][0] == 2
 
-# 5) 16 h after Part 1: votes close (6 votes for OPEN), Part 2A is rendered, scheduled +24 h and sent for review
+# 5) 16 h after Part 1: votes close (6 votes for OPEN), Part 2A is rendered, scheduled +24 h and auto-approved
 first_sid = made[0]
 pipeline.step_votes.__defaults__ = ({"youtube": lambda vid: [{"author": f"u{i}", "text": "open", "at": "1"} for i in range(6)]},)
 posted_at = datetime.fromisoformat(q("SELECT MIN(p.posted_at) FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND p.status='posted'", first_sid)[0][0])
@@ -78,6 +79,7 @@ assert pipeline.tick(dry_run=True)
 assert q("SELECT winning_choice FROM stories WHERE id=?", first_sid)[0][0] == "A"
 p2 = q("SELECT p.scheduled_at FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=2 AND p.platform='youtube'", first_sid)[0][0]
 assert p2 == (posted_at + timedelta(hours=24)).isoformat(timespec="seconds"), p2
+assert q("SELECT status FROM videos WHERE story_id=? AND part=2", first_sid)[0][0] == "approved"  # owner reviews Part 1s only
 
 # 6) unanswered review for 12 h -> exactly one reminder, still not posted
 n_alerts = len([a for a in alerts if "Reminder" in a])
