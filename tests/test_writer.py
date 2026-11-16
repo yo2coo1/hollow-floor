@@ -3,7 +3,7 @@ import copy, json, tempfile
 from pathlib import Path
 from hollowfloor import db, writer
 
-base = json.load(open("stories/0001_notes.json", encoding="utf-8"))
+base = json.load(open("stories/0011_guestbook.json", encoding="utf-8"))
 calls = {"write": 0}
 
 def fake(prompt, temperature=0.9):

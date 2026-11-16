@@ -287,12 +287,12 @@ export const props = {
 // ---------- lights ----------
 // Moody defaults: low ambient, cold moonlight, warm bulbs. Events can flicker, black out, or shift everything to red.
 function lightRig(scene, spec) {
-  const ambient = new THREE.HemisphereLight('#4a5070', '#0a0a0f', spec.ambient ?? 0.35);
-  const moon = new THREE.DirectionalLight('#8aa4ff', spec.moon ?? 0.35);
+  const ambient = new THREE.HemisphereLight(spec.ambientColor ?? '#4a5070', spec.groundColor ?? '#0a0a0f', spec.ambient ?? 0.35);
+  const moon = new THREE.DirectionalLight(spec.moonColor ?? '#8aa4ff', spec.moon ?? 0.35);
   moon.position.set(3, 8, 5); moon.castShadow = true; moon.shadow.mapSize.set(1024, 1024);
   Object.assign(moon.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 });
   scene.add(ambient, moon);
-  return { ambient, moon, base: { ambient: ambient.intensity, moon: moon.intensity } };
+  return { ambient, moon, base: { ambient: ambient.intensity, moon: moon.intensity, ambientColor: ambient.color.clone() } };
 }
 
 // events: [{t, type:'red', dur}] [{t, until, type:'flicker', target?}] [{t, until, type:'blackout'}] [{t, type:'flash', color}]
@@ -359,7 +359,7 @@ export function buildScene(spec) {
   function update(t) {
     const r = redAmount(spec.events, t), lf = lightFactor(spec.events, t, '*');
     rig.ambient.intensity = rig.base.ambient * lf * (1 - r * 0.5);
-    rig.ambient.color.set('#4a5070').lerp(red, r);
+    rig.ambient.color.copy(rig.base.ambientColor).lerp(red, r);
     rig.moon.intensity = rig.base.moon * lf * (1 - r);
     for (const b of bulbs) {
       const f = lightFactor(spec.events, t, b.name);

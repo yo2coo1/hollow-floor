@@ -160,7 +160,13 @@ def _clamp(scene, shot, cam):
 
 
 def apply(scene):
-    shots = _split_long(sorted(scene["shots"], key=lambda s: s["t"]), scene["duration"])
+    from .config import CONFIG
+    style, styles = scene.get("style") or {}, CONFIG.get("styles", {})
+    max_len = styles.get("pacing", {}).get(style.get("pacing"), 3.8)
+    shake = styles.get("camera", {}).get(style.get("camera"))
+    shots = _split_long(sorted(scene["shots"], key=lambda s: s["t"]), scene["duration"], max_len)
+    if shake is not None:  # the story's camera style: handheld wobble ... locked tripod; a shot's own shake (scares) wins
+        shots = [s if "shake" in s else {**s, "shake": shake} for s in shots]
     ends = [s["t"] for s in shots[1:]] + [scene["duration"]]
     scene["shots"] = [_clamp(scene, s, camera(s, scene, e)) for s, e in zip(shots, ends)]
     return scene

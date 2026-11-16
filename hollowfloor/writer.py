@@ -27,7 +27,7 @@ Hard rules:
   now: each opens with a one-line recap thought of where things stand and the choice taken ("Okay. The chair asked me to
   sit. So I'm sitting."), and pays off with a twist. Part 1 says both choice words
   and asks viewers to comment one. Part 2 ends with "Follow for the next story."
-- Each script is 120-150 spoken words. Short sentences. Commas and "..." for pauses. Avoid long or hard-to-say words
+- Each script is WORDS_RANGE spoken words (each part runs a little over one minute). Short sentences. Commas and "..." for pauses. Avoid long or hard-to-say words
   (nothing over 12 letters) and names. Mark beats with [pause] (0.6 s silence) and [scare] (silence + scare hit); a beat
   at least every 25 words, at least one [scare] per part. The first sentence must open a question or threat.
 - There is NO narrator. Untagged lines are the main character thinking out loud, live, in the present tense, as it
@@ -38,7 +38,20 @@ Hard rules:
   line sets the mood until the next mark (inside a voice tag it applies to that line only: {grandma: [whisper] Stay.}).
   Build it up: calm or tense openings, scared as it gets close, panic right after a [scare], whisper when hiding.
 - Write the cliffhanger first, then the hook, then the middle."""
-RULES = RULES_TEXT.replace("ROLES_LIST", ", ".join(sorted(CONFIG["voice"].get("roles", {}))))
+RULES = RULES_TEXT.replace("ROLES_LIST", ", ".join(sorted(CONFIG["voice"].get("roles", {})))).replace(
+    "WORDS_RANGE", f'{CONFIG["video"]["words_min"]}-{CONFIG["video"]["words_max"]}')
+
+# Owner 2026-11-16: "I want creativity... not something that we're spamming online." Every story must feel made, not stamped out.
+CRAFT = f"""Craft (this channel is built for a community that finds the stories satisfying, not for volume):
+- Give the story its own world: a specific place with texture (the hum of a heater, a sticker on the fridge, the smell of
+  bleach), a protagonist whose job, age or habit shapes how they react, and one memorable image nobody else would use.
+- Use the length for build-up and character, not padding: plant a small human detail early that pays off in the twist.
+- Add a "style" object that decides how the episode looks and moves. Pick what serves THIS story and differs from the
+  recent ones: {{"setting": a short place description, "time": "night", "dusk", "dawn", "day", "storm"...,
+  "look": one of {sorted(CONFIG.get('looks', {}))}, "camera": one of {sorted(CONFIG['styles']['camera'])},
+  "pacing": one of {sorted(CONFIG['styles']['pacing'])}, "protagonist": who they are in a few words}}.
+  Camera: handheld = nervous and close, uneasy = slight drift, drifting = slow and dreamlike, locked = still, watched, CCTV-like.
+  Pacing: slow-burn = long held shots and dread, steady = default, frantic = quick cuts for panic stories."""
 
 
 def _llm(prompt, temperature=0.9):
@@ -100,12 +113,17 @@ The channel owner rejected earlier videos for these reasons; avoid repeating the
 
 def _write_prompt(idea, problems=None):
     ex = _examples(idea.get("story_type"))
+    recent = [{"slug": r.get("slug"), "type": r.get("story_type"), **(r.get("style") or {})} for r in story.recent_stories({})]
     fix = f"\nYour previous attempt had these problems; fix all of them:\n- " + "\n- ".join(problems) if problems else ""
     return f"""{RULES}
 
+{CRAFT}
+
 Write the full story for this idea as ONE JSON object with exactly the same structure as the example below
 (slug, story_type, premise, idea, outline, choices, titles A/B, thumbs A/B, caption, captions_part2, hashtags,
-thumbnail_text, scripts, set, parts). Idea: {json.dumps(idea)}
+thumbnail_text, scripts, set, parts) PLUS the "style" object. Idea: {json.dumps(idea)}
+The most recent stories (don't reuse a look from the last 2, the same camera + pacing as the last one, or a similar
+setting or protagonist): {json.dumps(recent)}
 
 Scene rules (the renderer only knows these):
 - prop types: {sorted(story.PROP_TYPES)}; shot templates: {sorted(story.SHOT_TPLS)} (each shot: {{"t", "tpl", "target", optional "at", "side", "dist", "fov", "shake"}});

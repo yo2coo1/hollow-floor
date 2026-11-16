@@ -154,6 +154,15 @@ def scene_for(story, key):
             s["props"].append(p)
     s.update(part)
     s["name"] = f'{story["slug"]}_{key}'
+    style = story.get("style") or {}
+    look = CONFIG.get("looks", {}).get(style.get("look"))
+    if look:  # the story's own colors; set.lights/fog keep their intensities
+        lights, fog = s.setdefault("lights", {}), s.setdefault("fog", {})
+        lights.update(ambientColor=look["ambient_color"], moonColor=look["moon_color"])
+        lights.setdefault("ambient", look["ambient"]); lights.setdefault("moon", look["moon"])
+        fog["color"] = look["fog_color"]; fog.setdefault("density", look["fog_density"])
+    if style:
+        s["style"] = {k: style.get(k) for k in ("camera", "pacing")}
     return s
 
 
@@ -208,5 +217,53 @@ def scene_problems(story):
     return p
 
 
-def all_problems(story, con=None):
-    return check(story, con) + cue_problems(story) + scene_problems(story)
+STYLE_KEYS = ("setting", "time", "look", "camera", "pacing", "protagonist")
+
+
+def style_problems(story):
+    """Every story declares its own look, camera, pacing, setting and protagonist (owner 2026-11-16: each video distinct)."""
+    st, p = story.get("style") or {}, []
+    for k in STYLE_KEYS:
+        if not str(st.get(k, "")).strip():
+            p.append(f"style.{k} is missing")
+    if st.get("look") and st["look"] not in CONFIG.get("looks", {}):
+        p.append(f"style.look '{st['look']}' must be one of {sorted(CONFIG.get('looks', {}))}")
+    for k in ("camera", "pacing"):
+        if st.get(k) and st[k] not in CONFIG["styles"][k]:
+            p.append(f"style.{k} '{st[k]}' must be one of {sorted(CONFIG['styles'][k])}")
+    return p
+
+
+def recent_stories(story, n=4, root=None):
+    """The n stories before this one (by file order), for the variety gate; for a new story, the newest n."""
+    from .config import ROOT
+    files = sorted((root or ROOT / "stories").glob("[0-9]*.json"))
+    mine = [i for i, f in enumerate(files) if json.loads(f.read_text(encoding="utf-8")).get("slug") == story.get("slug")]
+    files = files[:mine[0]] if mine else files
+    return [json.loads(f.read_text(encoding="utf-8")) for f in files[-n:]]
+
+
+def variety_problems(story, recent):
+    """No two neighbours look, move or feel alike."""
+    st, p = story.get("style") or {}, []
+    sim = lambda a, b: difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
+    for i, old in enumerate(reversed(recent)):  # i = 0 is the story just before
+        o = old.get("style") or {}
+        if not o:
+            continue
+        if i < 2 and st.get("look") == o.get("look"):
+            p.append(f"look '{st.get('look')}' was used by one of the last 2 stories ({old['slug']})")
+        if i < 1 and st.get("camera") == o.get("camera") and st.get("pacing") == o.get("pacing"):
+            p.append(f"same camera + pacing as the story before ({old['slug']})")
+        if sim(st.get("setting"), o.get("setting")) > 0.6:
+            p.append(f"setting too close to {old['slug']}: '{o.get('setting')}'")
+        if i < 3 and sim(st.get("protagonist"), o.get("protagonist")) > 0.6:
+            p.append(f"protagonist too close to {old['slug']}: '{o.get('protagonist')}'")
+    if recent and story.get("story_type") == recent[-1].get("story_type"):
+        p.append(f"same story type as the story before ({recent[-1].get('story_type')})")
+    return p
+
+
+def all_problems(story, con=None, recent=None):
+    recent = recent_stories(story) if recent is None else recent
+    return check(story, con) + cue_problems(story) + scene_problems(story) + style_problems(story) + variety_problems(story, recent)

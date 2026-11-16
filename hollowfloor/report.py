@@ -37,6 +37,43 @@ def _yt_stats(ids):
     return {it["id"]: it.get("statistics", {}) for it in d.get("items", [])}
 
 
+# Payout programs and what they need (checked Nov 2026; the platforms change these, so verify before applying).
+GOALS = [("YouTube Partner Program, early tier (fan funding)", {"subs": 500, "views90": 3_000_000}),
+         ("YouTube Partner Program, full tier (Shorts ad revenue)", {"subs": 1000, "views90": 10_000_000})]
+
+
+def _monetization(con, now, subs, problems):
+    """Progress toward YouTube's payout thresholds, with a rough date from the last week's growth.
+    Only YouTube can be read until the Instagram/TikTok developer apps are connected (from APIS_DAY)."""
+    try:
+        since90 = (now - timedelta(days=90)).isoformat(timespec="seconds")
+        ids = [r[0] for r in con.execute("SELECT platform_post_id FROM posts WHERE platform='youtube' AND status='posted' "
+                                         "AND platform_post_id IS NOT NULL AND posted_at >= ?", (since90,))]
+        views90 = sum(int(st.get("viewCount", 0)) for i in range(0, len(ids), 50) for st in _yt_stats(ids[i:i + 50]).values())
+    except Exception as ex:
+        problems.append(f"YouTube 90-day views could not be read: {str(ex)[:120]}")
+        return None
+    subs = int(subs) if subs is not None else None
+    # daily snapshots (aggregate channel numbers only, kept 30 days: YouTube API data policy)
+    log_ = json.loads(db.kv_get(con, "growth_log", "{}"))
+    log_[now.date().isoformat()] = {"subs": subs, "views90": views90}
+    log_ = dict(sorted(log_.items())[-30:])
+    db.kv_set(con, "growth_log", json.dumps(log_))
+    days = sorted(log_)
+    week = [d for d in days if d <= (now.date() - timedelta(days=7)).isoformat()]
+    base = log_[week[-1]] if week else log_[days[0]]
+    span = max(1, (now.date() - date.fromisoformat(week[-1] if week else days[0])).days)
+    rate = {k: ((log_[days[-1]][k] or 0) - (base[k] or 0)) / span for k in ("subs", "views90")}
+    goals = []
+    for name, need in GOALS:
+        have = {"subs": subs or 0, "views90": views90}
+        eta = [(need[k] - have[k]) / rate[k] for k in need if have[k] < need[k] and rate[k] > 0]
+        reached = all(have[k] >= need[k] for k in need)
+        goals.append({"name": name, "need": need, "have": have, "reached": reached,
+                      "eta": None if reached or len(eta) < sum(have[k] < need[k] for k in need) else now.date() + timedelta(days=int(max(eta)) + 1)})
+    return {"subs": subs, "views90": views90, "rate": rate, "goals": goals, "days_logged": len(days)}
+
+
 def collect(con, now, tz, live=True):
     """Everything the report shows, as plain data (live=False skips the YouTube API, for tests)."""
     since = (now - timedelta(hours=24)).isoformat(timespec="seconds")
@@ -80,6 +117,7 @@ def collect(con, now, tz, live=True):
                 log.warning("YouTube %s unavailable: %s", what, ex)
                 problems.append(f"YouTube {what} could not be read: {str(ex)[:120]}")
         subs = subs_box[0] if subs_box else None
+    money = _monetization(con, now, subs, problems) if live else None
     votes = [dict(story=r["id"], title=(r["title"] or "").replace(" (Part 1)", ""), winner=r["winning_choice"], counts=json.loads(r["vote_counts"] or "{}"))
              for r in con.execute("SELECT s.id, s.title, s.winning_choice, s.vote_counts FROM stories s JOIN videos v ON v.story_id=s.id AND v.part=2 "
                                   "WHERE s.winning_choice IS NOT NULL AND v.rendered_at >= ?", (since,))]
@@ -92,7 +130,7 @@ def collect(con, now, tz, live=True):
     upcoming = con.execute("SELECT v.story_id, v.part, MIN(p.scheduled_at) AS at, v.status FROM posts p JOIN videos v ON v.id=p.video_id "
                            "WHERE p.status IN ('queued','blocked') AND p.platform='youtube' AND p.scheduled_at BETWEEN ? AND ? GROUP BY v.id ORDER BY at",
                            (now.isoformat(timespec="seconds"), (now + timedelta(hours=24)).isoformat(timespec="seconds"))).fetchall()
-    return dict(date=now.astimezone(tz).date(), today=list(today.values()), match=match, stats=stats, comments=comments, subs=subs,
+    return dict(date=now.astimezone(tz).date(), today=list(today.values()), match=match, stats=stats, comments=comments, subs=subs, money=money,
                 votes=votes, review=[tuple(r) for r in review], late=[tuple(r) for r in late], errors=errors, failed_runs=failed_runs,
                 upcoming=[(r["story_id"], r["part"], r["at"], r["status"]) for r in upcoming],
                 audit_pending=CONFIG["posting"].get("youtube_privacy") == "hand", days_to_apis=(APIS_DAY - now.astimezone(tz).date()).days)
@@ -142,6 +180,19 @@ def render_html(d, tz):
     h.append("<h2>Next 24 hours (YouTube)</h2>" + ("<ul>" + "".join(
         f"<li>{datetime.fromisoformat(a).astimezone(tz):%a %H:%M} — Story {s} Part {p}" + (" (waiting for your ✅)" if st == "review" else "") + "</li>"
         for s, p, a, st in d["upcoming"]) + "</ul>" if d["upcoming"] else "<p>Nothing scheduled yet.</p>"))
+    m = d.get("money")
+    if m:
+        bar = lambda have, need: f"<span class=bar><i style='width:{min(100, 100 * have / need):.1f}%'></i></span> {have:,} / {need:,}"
+        h.append("<h2>Road to monetization</h2>")
+        for g in m["goals"]:
+            when = "✅ reached: apply in YouTube Studio → Earn" if g["reached"] else \
+                (f"at this week's pace, around {g['eta']:%b %d, %Y}" if g["eta"] else "not growing fast enough yet to estimate a date")
+            h.append(f"<div class=card><h3>{_e(g['name'])}</h3><p class=meta>Subscribers {bar(g['have']['subs'], g['need']['subs'])}</p>"
+                     f"<p class=meta>Shorts views, last 90 days {bar(g['have']['views90'], g['need']['views90'])}</p><p>{_e(when)}</p></div>")
+        h.append(f"<p class=note>This week: about {m['rate']['subs']:+.1f} subscribers/day and {m['rate']['views90']:+,.0f} views/day "
+                 f"({m['days_logged']} day(s) of history so far). Both YouTube tiers also need you to be 18 and 3+ uploads in 90 days. "
+                 "TikTok Creator Rewards (18+, 10,000 followers, 100,000 views in 30 days, videos over 1 minute) and Instagram "
+                 f"payouts show here once their developer apps are connected on {APIS_DAY:%b %d}.</p>")
     apis = f"starts {APIS_DAY:%b %d} (in {d['days_to_apis']} days)" if d["days_to_apis"] > 0 else "ready to connect"
     h.append("<h2>Status</h2><ul>" +
              f"<li>YouTube API audit: {'waiting for Google (videos go public through the PC meanwhile)' if d['audit_pending'] else 'approved: the cloud posts publicly'}</li>"
@@ -151,6 +202,8 @@ def render_html(d, tz):
            "h3{font-size:13px;margin:0 0 4px}.kpis{display:flex;gap:10px}.kpis div{flex:1;background:#f3f3f5;border-radius:8px;padding:8px;color:#555}"
            ".kpis b{display:block;font-size:20px;color:#111}.card{border:1px solid #e3e3e6;border-radius:8px;padding:8px 10px;margin:6px 0;page-break-inside:avoid}"
            ".card p{margin:2px 0}.meta{color:#666;font-size:11px}.note{color:#777;font-size:11px}ul{margin:4px 0 4px 18px;padding:0}"
+           ".bar{display:inline-block;width:160px;height:8px;background:#e6e6ea;border-radius:4px;vertical-align:middle;margin-right:6px}"
+           ".bar i{display:block;height:8px;background:#7a4fd0;border-radius:4px}"
            "table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:4px;text-align:left;vertical-align:top}")
     return f"<!doctype html><html><head><meta charset=utf-8><style>{css}</style></head><body>{''.join(h)}</body></html>"
 

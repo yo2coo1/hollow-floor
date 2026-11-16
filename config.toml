@@ -20,10 +20,10 @@ hold_new_part1 = true          # owner 2026-11-16: no new Part 1s until stories 
 width = 1080
 height = 1920
 fps = 30
-min_seconds = 45
-max_seconds = 60
-words_min = 120
-words_max = 150
+min_seconds = 62      # owner 2026-11-16: every part over 1 minute (TikTok pays only for 60 s+), aiming for 62-75 s
+max_seconds = 80
+words_min = 185       # the voice speaks ~2.95 words/s including [pause]/[scare] beats
+words_max = 225
 
 [voice]
 engine = "chatterbox"   # owner 2026-11-15: expressive delivery that follows the story's mood tags (was "kokoro": flat, fast)
@@ -72,6 +72,22 @@ enabled = true
 min_votes = 5             # fewer than this -> writer's default branch (a new channel gets few comments)
 close_after_hours = 16    # count votes 16 h after Part 1 posts, leaving ~8 h to render, review and post Part 2 at 24 h
 count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
+
+# Each story picks its own look, camera style and pacing (story["style"]); the variety gate stops repeats.
+# A look sets the light and fog colors (and default intensities); a story's set.lights/fog intensities still win.
+[looks]
+moonlit     = { ambient_color = "#4a5070", moon_color = "#8aa4ff", ambient = 0.5,  moon = 0.2,  fog_color = "#05060a", fog_density = 0.05 }
+sodium      = { ambient_color = "#6a4a2a", moon_color = "#ffad5a", ambient = 0.55, moon = 0.25, fog_color = "#140b04", fog_density = 0.05 }
+fluorescent = { ambient_color = "#4f6a5a", moon_color = "#d2ffe0", ambient = 0.65, moon = 0.15, fog_color = "#070c09", fog_density = 0.04 }
+candle      = { ambient_color = "#5a3a20", moon_color = "#ff9a50", ambient = 0.45, moon = 0.08, fog_color = "#0b0603", fog_density = 0.07 }
+storm       = { ambient_color = "#5a6068", moon_color = "#d0d8e8", ambient = 0.55, moon = 0.3,  fog_color = "#181b20", fog_density = 0.07 }
+dawn        = { ambient_color = "#7a6a78", moon_color = "#ffd2c0", ambient = 0.75, moon = 0.35, fog_color = "#2a2228", fog_density = 0.04 }
+neon        = { ambient_color = "#5a2a6a", moon_color = "#ff4fa0", ambient = 0.5,  moon = 0.25, fog_color = "#0d0410", fog_density = 0.05 }
+snow        = { ambient_color = "#8a96aa", moon_color = "#eef4ff", ambient = 0.75, moon = 0.35, fog_color = "#8890a0", fog_density = 0.03 }
+
+[styles]
+camera = { handheld = 0.03, uneasy = 0.015, drifting = 0.006, locked = 0.0 }   # default shake per shot
+pacing = { "slow-burn" = 4.6, steady = 3.8, frantic = 2.7 }                     # longest a shot may run before a cut (s)
 
 [render]
 # 3D is drawn at this fraction of 1080x1920, then scaled up; text is always full resolution.
