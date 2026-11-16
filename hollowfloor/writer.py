@@ -46,6 +46,8 @@ CRAFT = f"""Craft (this channel is built for a community that finds the stories 
 - Give the story its own world: a specific place with texture (the hum of a heater, a sticker on the fridge, the smell of
   bleach), a protagonist whose job, age or habit shapes how they react, and one memorable image nobody else would use.
 - Use the length for build-up and character, not padding: plant a small human detail early that pays off in the twist.
+- Open with the strangest true fact of the story in the first sentence (it is the hook: viewers decide in 1-3 seconds).
+- Give the night its own hour (11:40, 1:15, 4:50...). Most horror defaults to 3 AM; this channel has used it enough.
 - Add a "style" object that decides how the episode looks and moves. Pick what serves THIS story and differs from the
   recent ones: {{"setting": a short place description, "time": "night", "dusk", "dawn", "day", "storm"...,
   "look": one of {sorted(CONFIG.get('looks', {}))}, "camera": one of {sorted(CONFIG['styles']['camera'])},
