@@ -73,6 +73,40 @@ def due(data):
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
+QUEUES = {"instagram": ("ig_queue.json", "ig_posted.txt"), "tiktok": ("tt_queue.json", "tt_posted.txt")}
+
+
+def cross_queue(data, post_id, qdir=None):
+    """A Part 2 just went up on YouTube: queue the same video for the Instagram/TikTok hand-posting tasks, but only where
+    that story's Part 1 is already posted or queued, placed right after its Part 1 so the order is always right.
+    shortcut: new Part 1s are not cross-posted (too many for hand posting); the cloud does all platforms once the APIs exist."""
+    qdir = Path(qdir or ROOT / "out" / "public5")
+    con = sqlite3.connect(Path(data) / "data" / "hollowfloor.db"); con.row_factory = sqlite3.Row
+    v = con.execute("SELECT v.id, v.story_id, v.part FROM posts p JOIN videos v ON v.id=p.video_id WHERE p.id=?", (int(post_id),)).fetchone()
+    caps = {r["platform"]: r["caption"] for r in con.execute("SELECT platform, caption FROM posts WHERE video_id=?", (v["id"] if v else -1,))}
+    con.close()
+    src = ROOT / "out" / "hand" / f"post_{int(post_id)}.mp4"
+    if not v or v["part"] != 2 or not src.exists():
+        return
+    for pf, (qname, posted) in QUEUES.items():
+        row = {"caption": caps[pf]} if pf in caps else None
+        qf, pf_posted = qdir / qname, qdir / posted
+        q = json.loads(qf.read_text(encoding="utf-8")) if qf.exists() else []
+        done = {l.split()[0] for l in pf_posted.read_text().splitlines() if l.strip()} if pf_posted.exists() else set()
+        item = {"story": v["story_id"], "part": 2, "file": str(src), "caption": row["caption"] if row else ""}
+        if not row or any(i["story"] == v["story_id"] and i.get("part", 1) == 2 for i in q) or f"{v['story_id']}p2" in done:
+            continue
+        p1 = [n for n, i in enumerate(q) if i["story"] == v["story_id"] and i.get("part", 1) == 1]
+        if p1:
+            q.insert(p1[0] + 1, item)
+        elif str(v["story_id"]) in done:
+            q.insert(0, item)  # Part 1 is live there: this Part 2 goes next
+        else:
+            continue  # that platform never got Part 1
+        qf.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"queued story {v['story_id']} Part 2 for {pf}")
+
+
 def git(data, *a):
     return subprocess.run(["git", "-C", str(data)] + list(a), capture_output=True, text=True)
 
@@ -87,7 +121,12 @@ def done(data, post_id, url):
     git(data, "commit", "-qm", f"hand-posted YouTube post {post_id}")
     for _ in range(3):  # a cloud run may have pushed meanwhile; a new small file always rebases cleanly
         if git(data, "push", "-q").returncode == 0:
-            print("recorded", post_id, url); return
+            print("recorded", post_id, url)
+            try:
+                cross_queue(data, post_id)
+            except Exception as e:  # the YouTube post is already recorded; a queue problem must not undo that
+                print("cross-queue failed:", e)
+            return
         git(data, "pull", "--rebase", "-q")
     sys.exit("push failed: the marker is committed locally; run `git push` in the data clone")
 
