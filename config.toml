@@ -89,6 +89,21 @@ snow        = { ambient_color = "#8a96aa", moon_color = "#eef4ff", ambient = 0.7
 [styles]
 camera = { handheld = 0.03, uneasy = 0.015, drifting = 0.006, locked = 0.0 }   # default shake per shot
 pacing = { "slow-burn" = 3.95, steady = 3.4, frantic = 2.5 }                    # longest a shot may run before a cut (s); the renderer refuses shots over 4 s
+# Owner 2026-11-16: no repeated twists. Each ending names its twist kind (style.twists A/B); an ending may not reuse a kind
+# from the 2 stories before it, and a story's two endings must differ.
+[styles.twist]
+"on-record" = "a photo, video or recording shows me somewhere I wasn't"
+"double" = "something else is living my life or wearing my face"
+"followed-home" = "it followed me home, to my car or to my new place"
+"still-trapped" = "I never really left; I'm still there"
+"it-was-inside" = "it was in the room or the car with me all along"
+"invited-in" = "I let it in, and it thanks me"
+"possessed" = "someone I love, or I, came back changed"
+"next-victim" = "it has moved on to the next person (new owners, the new guy)"
+"loop" = "it happens again every night, forever"
+"it-knows-me" = "it knows my name, my floor or where I live, and it's coming"
+"never-existed" = "the place or person was gone or dead all along"
+"message" = "it leaves me a final message, note or voicemail"
 
 [render]
 # 3D is drawn at this fraction of 1080x1920, then scaled up; text is always full resolution.

@@ -231,6 +231,12 @@ def style_problems(story):
     for k in ("camera", "pacing"):
         if st.get(k) and st[k] not in CONFIG["styles"][k]:
             p.append(f"style.{k} '{st[k]}' must be one of {sorted(CONFIG['styles'][k])}")
+    tw, kinds = st.get("twists") or {}, CONFIG["styles"]["twist"]
+    for b in ("A", "B"):
+        if tw.get(b) not in kinds:
+            p.append(f"style.twists.{b} must be one of {sorted(kinds)}")
+    if tw.get("A") and tw.get("A") == tw.get("B"):
+        p.append("the two endings use the same twist kind")
     return p
 
 
@@ -259,6 +265,10 @@ def variety_problems(story, recent):
             p.append(f"setting too close to {old['slug']}: '{o.get('setting')}'")
         if i < 3 and sim(st.get("protagonist"), o.get("protagonist")) > 0.6:
             p.append(f"protagonist too close to {old['slug']}: '{o.get('protagonist')}'")
+        if i < 2:
+            for b, kind in ((st.get("twists") or {})).items():
+                if kind in (o.get("twists") or {}).values():
+                    p.append(f"ending {b} reuses twist '{kind}' from {old['slug']}")
     if recent and story.get("story_type") == recent[-1].get("story_type"):
         p.append(f"same story type as the story before ({recent[-1].get('story_type')})")
     return p

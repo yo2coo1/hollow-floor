@@ -78,34 +78,37 @@ QUEUES = {"instagram": ("ig_queue.json", "ig_posted.txt"), "tiktok": ("tt_queue.
 
 
 def cross_queue(data, post_id, qdir=None):
-    """A Part 2 just went up on YouTube: queue the same video for the Instagram/TikTok hand-posting tasks, but only where
-    that story's Part 1 is already posted or queued, placed right after its Part 1 so the order is always right.
-    shortcut: new Part 1s are not cross-posted (too many for hand posting); the cloud does all platforms once the APIs exist."""
+    """A video just went up on YouTube: queue the same file for the Instagram/TikTok hand-posting tasks so all three
+    accounts carry the same stories (owner, 2026-11-16). A Part 1 goes to the back of the queue. A Part 2 goes right
+    after its Part 1 if that is still queued, first if its Part 1 is already live there, and never where Part 1 is missing."""
     qdir = Path(qdir or ROOT / "out" / "public5")
     con = sqlite3.connect(Path(data) / "data" / "hollowfloor.db"); con.row_factory = sqlite3.Row
     v = con.execute("SELECT v.id, v.story_id, v.part FROM posts p JOIN videos v ON v.id=p.video_id WHERE p.id=?", (int(post_id),)).fetchone()
     caps = {r["platform"]: r["caption"] for r in con.execute("SELECT platform, caption FROM posts WHERE video_id=?", (v["id"] if v else -1,))}
     con.close()
     src = ROOT / "out" / "hand" / f"post_{int(post_id)}.mp4"
-    if not v or v["part"] != 2 or not src.exists():
+    if not v or not src.exists():
         return
     for pf, (qname, posted) in QUEUES.items():
         row = {"caption": caps[pf]} if pf in caps else None
         qf, pf_posted = qdir / qname, qdir / posted
         q = json.loads(qf.read_text(encoding="utf-8")) if qf.exists() else []
         done = {l.split()[0] for l in pf_posted.read_text().splitlines() if l.strip()} if pf_posted.exists() else set()
-        item = {"story": v["story_id"], "part": 2, "file": str(src), "caption": row["caption"] if row else ""}
-        if not row or any(i["story"] == v["story_id"] and i.get("part", 1) == 2 for i in q) or f"{v['story_id']}p2" in done:
+        part, sid = v["part"], v["story_id"]
+        item = {"story": sid, "part": part, "file": str(src), "caption": row["caption"] if row else ""}
+        if not row or any(i["story"] == sid and i.get("part", 1) == part for i in q) or (f"{sid}p2" if part == 2 else str(sid)) in done:
             continue
-        p1 = [n for n, i in enumerate(q) if i["story"] == v["story_id"] and i.get("part", 1) == 1]
-        if p1:
+        p1 = [n for n, i in enumerate(q) if i["story"] == sid and i.get("part", 1) == 1]
+        if part == 1:
+            q.append(item)
+        elif p1:
             q.insert(p1[0] + 1, item)
         elif str(v["story_id"]) in done:
             q.insert(0, item)  # Part 1 is live there: this Part 2 goes next
         else:
             continue  # that platform never got Part 1
         qf.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
-        print(f"queued story {v['story_id']} Part 2 for {pf}")
+        print(f"queued story {sid} Part {part} for {pf}")
 
 
 def git(data, *a):

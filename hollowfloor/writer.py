@@ -49,7 +49,9 @@ CRAFT = f"""Craft (this channel is built for a community that finds the stories 
 - Add a "style" object that decides how the episode looks and moves. Pick what serves THIS story and differs from the
   recent ones: {{"setting": a short place description, "time": "night", "dusk", "dawn", "day", "storm"...,
   "look": one of {sorted(CONFIG.get('looks', {}))}, "camera": one of {sorted(CONFIG['styles']['camera'])},
-  "pacing": one of {sorted(CONFIG['styles']['pacing'])}, "protagonist": who they are in a few words}}.
+  "pacing": one of {sorted(CONFIG['styles']['pacing'])}, "protagonist": who they are in a few words,
+  "twists": {{"A": kind, "B": kind}}}}. Twist kinds (the two endings differ, and neither repeats the last 2 stories):
+  {json.dumps(CONFIG['styles']['twist'])}.
   Camera: handheld = nervous and close, uneasy = slight drift, drifting = slow and dreamlike, locked = still, watched, CCTV-like.
   Pacing: slow-burn = long held shots and dread, steady = default, frantic = quick cuts for panic stories."""
 

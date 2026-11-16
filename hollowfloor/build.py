@@ -44,7 +44,10 @@ def build(scene_path, script, out_mp4, scale=1.0):
     words = voice.word_times(narr, script)
     markers = {**r["markers"], "end": r["seconds"]}
     raw = scene_path if isinstance(scene_path, dict) else json.loads(Path(scene_path).read_text())
-    scene = director.apply(resolve(raw, markers, words))
+    scene = resolve(raw, markers, words)
+    # owner 2026-11-16: every part clears TikTok's 1-minute line; a short part holds its last frame (choice/end card) longer
+    scene["duration"] = max(scene["duration"], CONFIG["video"]["min_seconds"])
+    scene = director.apply(scene)
     scene["captions"] = words
     r_cfg = CONFIG.get("render", {})
     scene.setdefault("quality", {"aa": True, "shadows": r_cfg.get("shadows", "basic"), "scale": r_cfg.get("scale", 0.75)})
