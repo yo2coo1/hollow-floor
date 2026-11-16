@@ -1,7 +1,9 @@
 """python -m tests.test_writer — exercises the writer's gates with a fake LLM (no API key needed)."""
 import copy, json, tempfile
 from pathlib import Path
-from hollowfloor import db, writer
+from hollowfloor import db, story, writer
+
+story.recent_stories = lambda *a, **k: []  # isolate from the real stories/ folder (the variety gate would compare against them)
 
 base = json.load(open("stories/0011_guestbook.json", encoding="utf-8"))
 calls = {"write": 0}

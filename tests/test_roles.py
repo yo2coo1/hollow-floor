@@ -10,7 +10,7 @@ s = json.loads(Path("stories/0011_guestbook.json").read_text(encoding="utf-8"))
 s["scripts"] = {k: story.plain(v) for k, v in s["scripts"].items()}  # start untagged
 base = story.check(s)
 tagged = json.loads(json.dumps(s))
-tagged["scripts"]["part1"] = tagged["scripts"]["part1"].replace("let me in, it's freezing.", "{sister: let me in, it's freezing.}")
+tagged["scripts"]["part1"] = tagged["scripts"]["part1"].replace("Let me in. It's freezing out here.", "{sister: Let me in. It's freezing out here.}")
 assert "{sister:" in tagged["scripts"]["part1"]
 assert story.check(tagged) == base and story.cue_problems(tagged) == story.cue_problems(s)  # tag changes nothing else
 bad = json.loads(json.dumps(tagged)); bad["scripts"]["part1"] = bad["scripts"]["part1"].replace("{sister:", "{auntie:")
