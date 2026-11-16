@@ -6,8 +6,9 @@ on:
       dry_run: {description: "Do everything except really posting", type: boolean, default: true}
       scratch: {description: "Use a throwaway copy of the database (test run, nothing saved)", type: boolean, default: true}
       selftest: {description: "Only render the short test clip (checks voice + renderer; nothing posted or saved)", type: boolean, default: false}
+  # 11 scheduled runs a day at the moments that matter (times UTC; New York = UTC-5, UTC-4 in summer).
+  # These run in the cloud with the owner's PC off; the PC task HollowFloor-kick is only a backup.
   schedule:
-  # 8 runs a day at the moments that matter, not hourly (saves free minutes). Times are UTC; New York = UTC-5 (UTC-4 in summer).
     - cron: "17 9 * * *"   # 04:17 NY  votes close for 12:00 Part 1s; plan/render tomorrow's slots
     - cron: "17 14 * * *"  # 09:17 NY  votes close for 17:00 Part 1s
     - cron: "2 17 * * *"   # 12:02 NY  post slot 1
