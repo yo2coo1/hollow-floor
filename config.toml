@@ -72,8 +72,7 @@ enabled = true
 min_votes = 5             # fewer than this -> writer's default branch (a new channel gets few comments)
 close_after_hours = 13    # TEMPORARY 2026-11-16 (owner: all Part 2s at noon); normal is 16
 part2_after_hours = 15    # TEMPORARY 2026-11-16; normal is 24 (Part 2 posts 24 h after Part 1)
-count_platforms = []   # TEMPORARY 2026-11-16: no YouTube API key yet; checked by hand, no story had 5 votes. Normal: ["youtube", "instagram"]
-# count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
+count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
 
 # Each story picks its own look, camera style and pacing (story["style"]); the variety gate stops repeats.
 # A look sets the light and fog colors (and default intensities); a story's set.lights/fog intensities still win.
