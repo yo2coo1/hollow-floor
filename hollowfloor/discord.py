@@ -21,7 +21,7 @@ from .config import get_logger, secret
 
 log = get_logger("discord")
 API = "https://discord.com/api/v10"
-CHANNELS = {"reviews": "DISCORD_REVIEWS_CHANNEL_ID", "alerts": "DISCORD_ALERTS_CHANNEL_ID"}
+CHANNELS = {"reviews": "DISCORD_REVIEWS_CHANNEL_ID", "alerts": "DISCORD_ALERTS_CHANNEL_ID", "report": "DISCORD_REPORT_CHANNEL_ID"}
 YES, NO = "✅", "❌"
 UPLOAD_LIMIT = 9_500_000  # bots on a non-boosted server may upload ~10 MB per message
 FFMPEG = os.environ.get("FFMPEG_PATH", "ffmpeg")
@@ -143,4 +143,5 @@ def alert(text):
 
 if __name__ == "__main__":  # python -m hollowfloor.discord  -> test message to both channels
     for ch in CHANNELS:
-        print(ch, "ok, message", send(ch, f"Hollow Floor Bot test: #{ch} connected."))
+        if secret(CHANNELS[ch]):
+            print(ch, "ok, message", send(ch, f"Hollow Floor Bot test: #{ch} connected."))

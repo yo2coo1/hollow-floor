@@ -4,6 +4,7 @@ Claude task on this PC uploads them publicly in YouTube Studio, then reports eac
 
   python scripts/hand_post.py due  <data repo clone>             -> JSON list of approved, due YouTube posts with a ready upload file
   python scripts/hand_post.py done <data repo clone> <post id> <shorts url>   -> commits data/hand_posted/<id>.json and pushes
+  python scripts/hand_post.py mark <data repo clone> instagram|tiktok <story> <part> [url]   -> same, for a Reel/TikTok posted by hand
 
 The cloud run imports data/hand_posted/*.json into the database (pipeline.step_hand_posted).
 Needs GITHUB_TOKEN (for encrypted render artifacts), ARTIFACT_KEY (.env) and FFMPEG_PATH."""
@@ -111,26 +112,46 @@ def git(data, *a):
     return subprocess.run(["git", "-C", str(data)] + list(a), capture_output=True, text=True)
 
 
+def _push(data, f, msg):
+    """Commit one new marker file in the data clone and push it (new small files always rebase cleanly)."""
+    git(data, "add", str(f.relative_to(data)))
+    git(data, "commit", "-qm", msg)
+    for _ in range(3):  # a cloud run may have pushed meanwhile
+        if git(data, "push", "-q").returncode == 0:
+            return True
+        git(data, "pull", "--rebase", "-q")
+    return False
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
 def done(data, post_id, url):
     assert url.startswith("https://youtube.com/shorts/") and len(url.rsplit("/", 1)[-1]) == 11, f"bad url {url}"
     f = Path(data) / "data" / "hand_posted" / f"{int(post_id)}.json"
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(json.dumps({"post_id": int(post_id), "url": url,
-                             "posted_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}), encoding="utf-8")
-    git(data, "add", str(f.relative_to(data)))
-    git(data, "commit", "-qm", f"hand-posted YouTube post {post_id}")
-    for _ in range(3):  # a cloud run may have pushed meanwhile; a new small file always rebases cleanly
-        if git(data, "push", "-q").returncode == 0:
-            print("recorded", post_id, url)
-            try:
-                cross_queue(data, post_id)
-            except Exception as e:  # the YouTube post is already recorded; a queue problem must not undo that
-                print("cross-queue failed:", e)
-            return
-        git(data, "pull", "--rebase", "-q")
-    sys.exit("push failed: the marker is committed locally; run `git push` in the data clone")
+    f.write_text(json.dumps({"post_id": int(post_id), "url": url, "posted_at": _now()}), encoding="utf-8")
+    if not _push(data, f, f"hand-posted YouTube post {post_id}"):
+        sys.exit("push failed: the marker is committed locally; run `git push` in the data clone")
+    print("recorded", post_id, url)
+    try:
+        cross_queue(data, post_id)
+    except Exception as e:  # the YouTube post is already recorded; a queue problem must not undo that
+        print("cross-queue failed:", e)
+
+
+def mark(data, platform, story, part, url=""):
+    """Instagram/TikTok post made by hand: tell the cloud (for the daily report's cross-platform check)."""
+    assert platform in QUEUES and int(part) in (1, 2), "usage: mark <data> instagram|tiktok <story> <1|2> [url]"
+    f = Path(data) / "data" / "hand_posted" / f"{platform}-{int(story)}-{int(part)}.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"platform": platform, "story": int(story), "part": int(part), "url": url or None, "posted_at": _now()}), encoding="utf-8")
+    if not _push(data, f, f"hand-posted {platform} story {story} part {part}"):
+        sys.exit("push failed: the marker is committed locally; run `git push` in the data clone")
+    print("recorded", platform, story, part)
 
 
 if __name__ == "__main__":
     cmd, data = sys.argv[1], Path(sys.argv[2])
-    due(data) if cmd == "due" else done(data, sys.argv[3], sys.argv[4])
+    {"due": lambda: due(data), "done": lambda: done(data, *sys.argv[3:5]), "mark": lambda: mark(data, *sys.argv[3:7])}[cmd]()

@@ -277,6 +277,15 @@ def step_hand_posted(con, root=None):
     (new small files never conflict with this run's database push), this run copies them into the database and removes them."""
     for f in sorted(((root or ROOT) / "data" / "hand_posted").glob("*.json")):
         h = json.loads(f.read_text(encoding="utf-8"))
+        if "platform" in h:  # Instagram/TikTok Reel posted by hand (found by story + part)
+            r = con.execute("SELECT p.id FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=? AND p.platform=?",
+                            (h["story"], h["part"], h["platform"])).fetchone()
+            if r:
+                con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, error=NULL WHERE id=? AND status!='posted'",
+                            (h["posted_at"], h.get("url") or f"{h['platform']}://hand/{h['story']}-{h['part']}", r[0]))
+            else:
+                log.warning("hand post %s: no %s post row for story %s part %s", f.name, h["platform"], h["story"], h["part"])
+            con.commit(); f.unlink(); continue
         con.execute("UPDATE posts SET status='posted', posted_at=?, url=?, platform_post_id=?, attempts=attempts+1, error=NULL WHERE id=? AND status!='posted'",
                     (h["posted_at"], h["url"], h["url"].rsplit("/", 1)[-1], int(h["post_id"])))
         if not db.kv_get(con, "first_post_at"):
@@ -310,15 +319,18 @@ def step_votes(con, now, comment_fetch=None):
         if now < first + timedelta(hours=V["close_after_hours"]):
             continue
         sid, s = r["id"], story_file(r["id"])
-        comments = {}
+        comments, yt_failed = {}, False
         for pf in V["count_platforms"]:
             post = con.execute("SELECT p.platform_post_id FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=1 AND p.platform=? AND p.status='posted'",
                                (sid, pf)).fetchone()
-            if post and pf in fetch:
+            if post and post[0] and pf in fetch:  # hand-made Instagram/TikTok posts have no id to read comments from
                 try:
                     comments[pf] = fetch[pf](post[0])
                 except Exception as e:
                     db.log_error(con, f"votes:{pf}", str(e))
+                    yt_failed |= pf == "youtube"
+        if yt_failed and now < first + timedelta(hours=V["close_after_hours"] + 8):
+            continue  # couldn't read the YouTube votes: try again next run instead of silently picking the default ending
         counts = votes.tally(comments, s["choices"]["A"]["label"], s["choices"]["B"]["label"])
         winner, why = votes.decide(counts, s["choices"]["default"], V["min_votes"])
         con.execute("UPDATE stories SET winning_choice=?, vote_counts=? WHERE id=?", (winner, json.dumps(counts), sid)); con.commit()
@@ -358,6 +370,12 @@ def step_daily_summary(con, now):
     fails = con.execute("SELECT COUNT(*) FROM runs WHERE ok=0 AND started_at >= ?", (since,)).fetchone()[0]
     blocked = con.execute("SELECT DISTINCT platform FROM posts WHERE status='blocked'").fetchall()
     waiting = con.execute("SELECT COUNT(*) FROM videos WHERE status='review'").fetchone()[0]
+    try:  # the full PDF report (posted videos, top comments, cross-platform check, numbers); the short text below is the fallback
+        from . import report
+        report.send(con, now, TZ)
+        db.kv_set(con, "summary_date", today); return
+    except Exception as e:
+        db.log_error(con, "report", f"{type(e).__name__}: {e}")
     msg = [f"📊 **Daily summary** ({today})", f"Posted: {len(posted)}"] + [f"• {p['platform']}: {p['title']} {p['url'] or ''}" for p in posted] + \
           [f"Waiting for your review: {waiting}", f"Blocked platforms: {', '.join(b[0] for b in blocked) or 'none'}",
            f"Health: {'✅ all runs OK' if not fails else f'⚠️ {fails} failed run(s) in 24 h'}",

@@ -137,14 +137,25 @@ def upload(path, title, description, tags, privacy="private", publish_at=None, t
     return vid
 
 
+def public_get(path, params):
+    """Read public data with the API key (YOUTUBE_API_KEY). commentThreads.list needs either this or the youtube.force-ssl
+    scope, which our sign-in doesn't ask for (it's a write scope); a key restricted to the YouTube Data API is enough for reading."""
+    key = secret("YOUTUBE_API_KEY")
+    if not key:
+        raise RuntimeError("YOUTUBE_API_KEY is not set: reading comments (votes, report) needs it")
+    url = f"{API}/{path}?" + urllib.parse.urlencode({**params, "key": key})
+    with urllib.request.urlopen(urllib.request.Request(url), timeout=60) as r:
+        return json.loads(r.read())
+
+
 def comments(video_id):
     """Top-level comments for the vote: [{"author", "text", "at"}]. Costs 1 quota unit per page."""
-    token, out, page = access_token(), [], None
+    out, page = [], None
     while True:
         params = {"part": "snippet", "videoId": video_id, "maxResults": 100, "textFormat": "plainText"}
         if page:
             params["pageToken"] = page
-        d, _ = _api("GET", "commentThreads", token, params=params)
+        d = public_get("commentThreads", params)
         for it in d.get("items", []):
             s = it["snippet"]["topLevelComment"]["snippet"]
             out.append({"author": s.get("authorChannelId", {}).get("value", s.get("authorDisplayName")), "text": s["textDisplay"], "at": s["publishedAt"]})
