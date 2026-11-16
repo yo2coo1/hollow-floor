@@ -337,13 +337,15 @@ def step_votes(con, now, comment_fetch=None):
     from . import youtube
     from . import instagram
     fetch = comment_fetch or {"youtube": youtube.comments, "instagram": instagram.comments}
-    rows = con.execute("SELECT s.id, MIN(p.posted_at) AS first FROM stories s JOIN videos v ON v.story_id=s.id AND v.part=1 "
-                       "JOIN posts p ON p.video_id=v.id AND p.status='posted' WHERE s.winning_choice IS NULL GROUP BY s.id").fetchall()
+    rows = con.execute("SELECT s.id, s.winning_choice, MIN(p.posted_at) AS first FROM stories s JOIN videos v ON v.story_id=s.id AND v.part=1 "
+                       "JOIN posts p ON p.video_id=v.id AND p.status='posted' WHERE (s.winning_choice IS NULL OR NOT EXISTS (SELECT 1 FROM videos v2 WHERE v2.story_id=s.id AND v2.part=2)) GROUP BY s.id").fetchall()
     for r in rows:
         first = parse(r["first"])
         if now < first + timedelta(hours=V["close_after_hours"]):
             continue
         sid, s = r["id"], story_file(r["id"])
+        if r["winning_choice"]:  # decided earlier but the render failed: render it now
+            render_vote(con, sid, s, r["winning_choice"], "earlier vote", first, now); continue
         comments, yt_failed = {}, False
         for pf in V["count_platforms"]:
             post = con.execute("SELECT p.platform_post_id FROM posts p JOIN videos v ON v.id=p.video_id WHERE v.story_id=? AND v.part=1 AND p.platform=? AND p.status='posted'",
@@ -364,12 +366,16 @@ def step_votes(con, now, comment_fetch=None):
             counts["pc"] = forced.get("counts")
         con.execute("UPDATE stories SET winning_choice=?, vote_counts=? WHERE id=?", (winner, json.dumps(counts), sid)); con.commit()
         log.info("story %s vote: %s (%s)", sid, winner, why)
-        key = f"part2{winner}"
-        vid = render_part(con, sid, s, key)
-        when = first + timedelta(hours=V.get("part2_after_hours", 24))
-        queue_posts(con, sid, s, key, vid, when)
-        send_for_review(con, vid, sid, s, key, when, now)
-        discord.alert(f"🗳️ Story {sid} vote closed: {why}. Part 2 ({s['choices'][winner]['label']}) is rendered and scheduled.")
+        render_vote(con, sid, s, winner, why, first, now)
+
+
+def render_vote(con, sid, s, winner, why, first, now):
+    key = f"part2{winner}"
+    vid = render_part(con, sid, s, key)
+    when = first + timedelta(hours=V.get("part2_after_hours", 24))
+    queue_posts(con, sid, s, key, vid, when)
+    send_for_review(con, vid, sid, s, key, when, now)
+    discord.alert(f"🗳️ Story {sid} vote closed: {why}. Part 2 ({s['choices'][winner]['label']}) is rendered and scheduled.")
 
 
 def step_health(con, run_id, ok, summary):
@@ -460,8 +466,10 @@ def needs_render(con, now):
     """Cheap check the workflow runs first, so the heavy render tools are only installed when needed."""
     if not S.get("hold_new_part1") and [t for t in next_part1_slots(con, now) if iso(t) not in taken_slots(con)]:
         return True
+    if list((ROOT / "data" / "hand_posted").glob("vote-*.json")):  # a PC vote may change an ending: Part 2 re-renders
+        return True
     for r in con.execute("SELECT MIN(p.posted_at) FROM stories s JOIN videos v ON v.story_id=s.id AND v.part=1 JOIN posts p ON p.video_id=v.id "
-                         "AND p.status='posted' WHERE s.winning_choice IS NULL GROUP BY s.id"):
+                         "AND p.status='posted' WHERE (s.winning_choice IS NULL OR NOT EXISTS (SELECT 1 FROM videos v2 WHERE v2.story_id=s.id AND v2.part=2)) GROUP BY s.id"):
         if now >= parse(r[0]) + timedelta(hours=V["close_after_hours"]):
             return True
     return False
