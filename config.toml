@@ -87,7 +87,7 @@ snow        = { ambient_color = "#8a96aa", moon_color = "#eef4ff", ambient = 0.7
 
 [styles]
 camera = { handheld = 0.03, uneasy = 0.015, drifting = 0.006, locked = 0.0 }   # default shake per shot
-pacing = { "slow-burn" = 4.6, steady = 3.8, frantic = 2.7 }                     # longest a shot may run before a cut (s)
+pacing = { "slow-burn" = 3.95, steady = 3.4, frantic = 2.5 }                    # longest a shot may run before a cut (s); the renderer refuses shots over 4 s
 
 [render]
 # 3D is drawn at this fraction of 1080x1920, then scaled up; text is always full resolution.
