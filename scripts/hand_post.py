@@ -24,14 +24,19 @@ from hollowfloor.config import ROOT  # noqa: E402
 LIMIT = 9_600_000  # the browser upload tool takes files up to 10 MB
 
 
+def seconds(f):
+    ff = os.environ.get("FFMPEG_PATH", "ffmpeg")
+    probe = str(Path(ff).with_name("ffprobe" + Path(ff).suffix)) if os.sep in ff or "/" in ff else "ffprobe"
+    return float(subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(f)],
+                                capture_output=True, text=True, check=True).stdout)
+
+
 def fit(src, dst):
     """Copy, or re-encode two-pass x264 to ~9.3 MB when the render is too big for the browser upload."""
     if src.stat().st_size <= LIMIT:
         shutil.copy2(src, dst); return
     ff = os.environ.get("FFMPEG_PATH", "ffmpeg")
-    probe = str(Path(ff).with_name("ffprobe" + Path(ff).suffix)) if os.sep in ff or "/" in ff else "ffprobe"
-    dur = float(subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(src)],
-                               capture_output=True, text=True, check=True).stdout)
+    dur = seconds(src)
     kbps = int(9_300_000 * 8 / dur / 1000) - 128
     log = str(dst.with_suffix(""))
     for extra in (["-pass", "1", "-an", "-f", "null", os.devnull],
@@ -47,7 +52,7 @@ def due(data):
     con = sqlite3.connect(Path(data) / "data" / "hollowfloor.db"); con.row_factory = sqlite3.Row
     soon = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat(timespec="seconds")
     marked = {f.stem for f in (Path(data) / "data" / "hand_posted").glob("*.json")}
-    rows = con.execute("SELECT p.id, p.title, p.caption, p.scheduled_at, v.story_id, v.part, v.file_path, v.artifact FROM posts p "
+    rows = con.execute("SELECT p.id, p.title, p.caption, p.scheduled_at, v.story_id, v.part, v.file_path, v.artifact, v.seconds FROM posts p "
                        "JOIN videos v ON v.id=p.video_id WHERE p.platform='youtube' AND p.status='queued' AND v.status='approved' "
                        "AND p.scheduled_at <= ? ORDER BY p.scheduled_at", (soon,)).fetchall()
     out = []
@@ -63,12 +68,19 @@ def due(data):
                 "title": r["title"], "description": desc}
         try:
             src = storage.ensure(r["file_path"], r["artifact"])
+            want = r["seconds"]
             dst = ROOT / "out" / "hand" / f"post_{r['id']}.mp4"
             dst.parent.mkdir(parents=True, exist_ok=True)
             # never reuse a copy of an older render (a download keeps its original date, so its stamp's date counts too)
             made = max(f.stat().st_mtime for f in (src, src.with_name(src.name + ".from")) if f.exists())
             if not dst.exists() or dst.stat().st_mtime < made:
                 fit(src, dst)
+            # last guard against posting a stale copy (2026-11-16: old-voice test renders went out): the copy must be
+            # as long as the approved render the cloud recorded
+            got = seconds(dst)
+            if want and abs(got - want) > 1.0:
+                dst.unlink()
+                raise RuntimeError(f"posting copy is {got:.1f}s but the approved render is {want:.1f}s: refused")
             item["file"] = str(dst)
         except Exception as e:
             item["error"] = f"{type(e).__name__}: {e}"[:300]
