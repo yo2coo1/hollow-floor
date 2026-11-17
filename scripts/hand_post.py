@@ -65,7 +65,9 @@ def due(data):
             src = storage.ensure(r["file_path"], r["artifact"])
             dst = ROOT / "out" / "hand" / f"post_{r['id']}.mp4"
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:  # never reuse a copy of an older render
+            # never reuse a copy of an older render (a download keeps its original date, so its stamp's date counts too)
+            made = max(f.stat().st_mtime for f in (src, src.with_name(src.name + ".from")) if f.exists())
+            if not dst.exists() or dst.stat().st_mtime < made:
                 fit(src, dst)
             item["file"] = str(dst)
         except Exception as e:
