@@ -14,7 +14,7 @@ post_times_local = ["12:00", "17:00", "21:00"]   # adjusted from analytics in mo
 timezone = "America/New_York"  # TODO confirm with owner
 review_period_days = 14
 review_reminder_hours = 12
-hold_new_part1 = false         # true = no new Part 1s (votes/Part 2s/posting keep running); used 2026-11-16 while stories 11-19 were rewritten
+hold_new_part1 = true          # true = no new Part 1s (votes/Part 2s/posting keep running); on 2026-11-16 while the posting backlog clears at 3 videos a day
 
 [video]
 width = 1080
