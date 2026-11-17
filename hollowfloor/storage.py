@@ -36,7 +36,13 @@ def stage(paths):
             dst = ROOT / "out" / "_new" / p.relative_to(ROOT / "out")
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, dst)
+            for f in (p, dst):  # remember which run made it, so an older local file with the same name is never mistaken for it
+                _stamp(f).write_text(artifact_name())
     return artifact_name()
+
+
+def _stamp(p):
+    return Path(p).with_name(Path(p).name + ".from")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -62,9 +68,13 @@ def ensure(rel_path, artifact):
     list them but not watch them. Renders made before the repo went public are kept in the private data repo."""
     p = ROOT / rel_path
     kept = ROOT / "data" / "renders" / Path(rel_path).relative_to("out")
-    if not p.exists() and kept.exists():  # bring the whole story folder: posting also needs the thumbnails next to the video
+    fresh = lambda: p.exists() and _stamp(p).exists() and _stamp(p).read_text().strip() == (artifact or "")
+    if kept.exists() and not fresh():  # bring the whole story folder: posting also needs the thumbnails next to the video
         shutil.copytree(kept.parent, p.parent, dirs_exist_ok=True)
-    if p.exists() or not artifact:
+        _stamp(p).write_text(artifact or "")
+    # a local file only counts if it came from this artifact: old test renders share these names (2026-11-16 bug:
+    # Part 2s went out with Nov 15 test renders in the old voice instead of the approved cloud renders)
+    if not artifact or fresh():
         return p
     repo, token = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"]
     h = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
@@ -83,4 +93,5 @@ def ensure(rel_path, artifact):
     log.info("restored %s from %s", rel_path, artifact)
     if not p.exists():
         raise FileNotFoundError(f"{rel_path} not inside {artifact}")
+    _stamp(p).write_text(artifact)
     return p

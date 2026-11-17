@@ -65,7 +65,7 @@ def due(data):
             src = storage.ensure(r["file_path"], r["artifact"])
             dst = ROOT / "out" / "hand" / f"post_{r['id']}.mp4"
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if not dst.exists():
+            if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:  # never reuse a copy of an older render
                 fit(src, dst)
             item["file"] = str(dst)
         except Exception as e:

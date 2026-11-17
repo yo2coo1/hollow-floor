@@ -35,6 +35,10 @@ def fake_open(req, timeout=0):
 with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(storage, "_download", lambda url, h: zb.getvalue()):
     p = storage.ensure("out/story_0042/part1.mp4", "renders-1")
 assert p.read_bytes() == b"video-bytes"
+# an older local file with the same name (e.g. a test render) is replaced by the artifact's version
+p.write_bytes(b"old-test-render"); (p.parent / "part1.mp4.from").unlink()
+with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(storage, "_download", lambda url, h: zb.getvalue()):
+    assert storage.ensure("out/story_0042/part1.mp4", "renders-1").read_bytes() == b"video-bytes"
 
 # renders made before the repo went public: kept in the private data repo, no download needed
 (root / "data" / "renders" / "story_0001").mkdir(parents=True)
