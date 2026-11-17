@@ -15,4 +15,8 @@ assert yt["caption"] != tt["caption"]                                          #
 p2 = metadata.post_text(s, "part2B", "instagram", 1)
 assert p2["title"].endswith("(Part 2)") and "Part 1" in p2["caption"] or "Follow" in p2["caption"]
 assert yt["caption"].lower().count("open or hide") == 1   # vote asked once, not twice
+# hashtags rotate between posts but keep the story's own specific tags
+st = dict(s, hashtags=["#scarystories", "#nightshift", "#creepy"])
+sets = {tuple(metadata.hashtags(st, k, pf)) for k in ("part1", "part2A", "part2B") for pf in ("youtube", "tiktok", "instagram")}
+assert len(sets) >= 5 and all(len(t) == 4 and t[0] == "#nightshift" for t in sets), sets
 print("metadata self-check: OK")

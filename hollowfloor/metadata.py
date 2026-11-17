@@ -24,6 +24,18 @@ def _pick(pool, *keys):
     return pool[h % len(pool)]
 
 
+# Broad tags rotate per post: identical hashtag blocks on every post read as spam (owner, 2026-11-16, after the
+# Instagram account was disabled). A story's own specific tags (#nightshift, #hauntedhouse...) are always kept.
+TAG_POOL = ["#scarystories", "#horrorstory", "#creepy", "#storytime", "#scary", "#horror", "#creepystory",
+            "#horrorshorts", "#spooky", "#nightmarefuel", "#scarystory", "#animatedstory"]
+
+
+def hashtags(story, key, platform):
+    own = [t for t in story["hashtags"] if t not in TAG_POOL and t != "#animation"][:2]
+    pool = sorted(TAG_POOL, key=lambda t: hashlib.sha1(f"{story['slug']}|{key}|{platform}|{t}".encode()).hexdigest())
+    return own + pool[:4 - len(own)]
+
+
 def versions(value):
     """Title/thumbnail fields may be a plain string (same for both) or {"A": .., "B": ..}."""
     return value if isinstance(value, dict) else {"A": value, "B": value}
@@ -48,7 +60,7 @@ def post_text(story, key, platform, story_id):
     else:
         hook = story.get("captions_part2", {}).get(key) or title.replace(" (Part 2)", ".")
         lines = [hook, _pick(PART2_FOLLOW, story["slug"], platform)]
-    tags = story["hashtags"]
+    tags = hashtags(story, key, platform)
     caption = "\n".join(lines) + "\n" + " ".join(tags)
     return {"variant": v, "title": title, "caption": caption, "thumb_text": thumb}
 
