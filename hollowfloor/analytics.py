@@ -17,14 +17,16 @@ def youtube_stats(video_id, posted_at):
     d, _ = youtube._api("GET", "videos", tok, params={"part": "statistics", "id": video_id})
     st = (d.get("items") or [{}])[0].get("statistics", {})
     out = {"views": int(st.get("viewCount", 0)), "likes": int(st.get("likeCount", 0)), "comments": int(st.get("commentCount", 0))}
-    try:  # Analytics API: watch time + subscribers gained (may lag ~1-2 days)
+    try:  # Analytics API: engaged views, watch time, average view %, subscribers gained. It lags 2-3 days: no rows = not ready
         import urllib.parse, urllib.request
         q = urllib.parse.urlencode({"ids": "channel==MINE", "startDate": posted_at[:10], "endDate": "2099-12-31",
-                                    "metrics": "estimatedMinutesWatched,averageViewPercentage,subscribersGained",
+                                    "metrics": "views,estimatedMinutesWatched,averageViewPercentage,subscribersGained",
                                     "filters": f"video=={video_id}"})
         req = urllib.request.Request("https://youtubeanalytics.googleapis.com/v2/reports?" + q, headers={"Authorization": f"Bearer {tok}"})
-        rows = json.loads(urllib.request.urlopen(req, timeout=60).read()).get("rows") or [[0, 0, 0]]
-        out.update(watch_min=rows[0][0], avg_view_pct=rows[0][1], follows=rows[0][2])
+        rows = json.loads(urllib.request.urlopen(req, timeout=60).read()).get("rows")
+        if rows:  # never record 0% for "not counted yet" (2026-11-19 bug: every retention figure was 0)
+            # Analytics "views" counts engaged views only (what YouTube's Partner Program counts); the public counter counts every start
+            out.update(engaged_views=rows[0][0], watch_min=rows[0][1], avg_view_pct=rows[0][2], follows=rows[0][3])
     except Exception as e:
         log.warning("analytics not available yet for %s: %s", video_id, e)
     return out
@@ -47,6 +49,18 @@ def step_metrics(con, now):
             m = youtube_stats(p["platform_post_id"], p["posted_at"])
             con.execute("INSERT INTO metrics (post_id, views, watch_time_s, likes, follows, saves, kind, raw) VALUES (?,?,?,?,?,?,?,?)",
                         (p["id"], m.get("views"), (m.get("watch_min") or 0) * 60, m.get("likes"), m.get("follows"), None, kind, json.dumps(m)))
+            con.commit()
+    # analytics arrive days later: fill in snapshots taken before they existed (or saved as 0 by the old bug), up to 7 days
+    fill = (now - timedelta(days=7)).isoformat(timespec="seconds")
+    for m in con.execute("SELECT m.id, m.raw, p.platform_post_id, p.posted_at FROM metrics m JOIN posts p ON p.id=m.post_id WHERE p.platform='youtube' "
+                         "AND p.posted_at >= ? AND p.platform_post_id IS NOT NULL", (fill,)).fetchall():
+        raw = json.loads(m["raw"] or "{}")
+        if raw.get("avg_view_pct") and raw.get("engaged_views") is not None:
+            continue
+        a = youtube_stats(m["platform_post_id"], m["posted_at"])
+        if a.get("avg_view_pct") is not None:  # keep the snapshot's own view count; add the analytics figures
+            raw.update({k: a[k] for k in ("engaged_views", "watch_min", "avg_view_pct", "follows")})
+            con.execute("UPDATE metrics SET raw=?, watch_time_s=?, follows=? WHERE id=?", (json.dumps(raw), raw["watch_min"] * 60, raw["follows"], m["id"]))
             con.commit()
 
 

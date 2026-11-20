@@ -24,4 +24,16 @@ analytics.youtube_stats = lambda *a: (_ for _ in ()).throw(AssertionError("must 
 analytics.step_metrics(con, now)
 left = {r[0] for r in con.execute("SELECT p.platform FROM metrics m JOIN posts p ON p.id=m.post_id")}
 assert left == {"tiktok"}, left
+# analytics lag: a snapshot saved before they existed (0% from the old bug) is filled in on a later run
+con.execute("INSERT INTO stories (id, premise, story_type, status) VALUES (2, 'q', 'night shifts', 'posted')")
+con.execute("INSERT INTO videos (id, story_id, part, branch, status) VALUES (3, 2, 1, '', 'posted')")
+con.execute("INSERT INTO posts (id, video_id, platform, platform_post_id, posted_at, status, url) VALUES (9, 3, 'youtube', 'vid9', '2026-12-28T00:00:00+00:00', 'posted', 'u')")
+con.execute("INSERT INTO metrics (post_id, views, kind, raw) VALUES (9, 500, '24h', ?)", (json.dumps({"views": 500, "avg_view_pct": 0}),))
+con.commit()
+analytics.youtube_stats = lambda vid, at: {"views": 900, "engaged_views": 120, "watch_min": 40, "avg_view_pct": 61.5, "follows": 2}
+analytics.step_metrics(con, now)
+raw = json.loads(con.execute("SELECT raw FROM metrics WHERE post_id=9 AND kind='24h'").fetchone()[0])
+assert raw["avg_view_pct"] == 61.5 and raw["engaged_views"] == 120 and raw["views"] == 500, raw
+analytics.youtube_stats = lambda vid, at: {"views": 900}  # still lagging: nothing is overwritten with zeros
+analytics.step_metrics(con, now)
 print("analytics self-check: OK")
