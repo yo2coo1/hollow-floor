@@ -10,11 +10,11 @@ story_types = ["haunted places", "strange neighbors", "unexplained messages", "n
 [schedule]
 stories_per_cycle = 3          # 3 Part 1s one day, 3 Part 2s the next
 part2_delay_hours = [12, 24]
-post_times_local = ["12:00", "17:00", "21:00"]   # adjusted from analytics in month 1
+post_times_local = ["17:00", "21:00"]   # 2026-11-19: 2 a day while reach recovers after burst posting; back to ["12:00", "17:00", "21:00"] from Nov 24
 timezone = "America/New_York"  # TODO confirm with owner
 review_period_days = 14
 review_reminder_hours = 12
-hold_new_part1 = true          # true = no new Part 1s (votes/Part 2s/posting keep running); on 2026-11-16 while the posting backlog clears at 3 videos a day
+hold_new_part1 = false         # true = no new Part 1s (votes/Part 2s/posting keep running)
 
 [video]
 width = 1080
