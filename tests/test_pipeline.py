@@ -41,6 +41,7 @@ clock = {"now": T}
 pipeline.utcnow = lambda: clock["now"]
 pipeline.P["youtube_privacy"] = "public"  # this test covers cloud posting, not the hand-posting stopgap
 pipeline.S["hold_new_part1"] = False  # the test plans new Part 1s whatever the live setting is
+pipeline.S["post_times_local"] = ["12:00", "17:00", "21:00"]  # the test expects 3 slots whatever the live pace is
 con = db.connect()
 q = lambda sql, *a: con.execute(sql, a).fetchall()
 
