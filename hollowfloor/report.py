@@ -14,7 +14,7 @@ from . import db, discord
 from .config import CONFIG, get_logger
 
 log = get_logger("report")
-PLATFORMS = ("youtube", "instagram", "tiktok")
+PLATFORMS = tuple(CONFIG["posting"]["platforms"])
 NAMES = {"youtube": "YouTube", "instagram": "Instagram", "tiktok": "TikTok"}
 APIS_DAY = date(2026, 11, 25)  # owner turns 18: Instagram/TikTok developer apps, so the cloud can post and read stats there
 

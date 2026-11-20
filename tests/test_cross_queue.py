@@ -11,6 +11,7 @@ root = Path(tempfile.mkdtemp())
 data, qdir = root / "data_clone", root / "q"
 (data / "data").mkdir(parents=True); qdir.mkdir(); (root / "out" / "hand").mkdir(parents=True)
 hand_post.ROOT = root
+hand_post.QUEUES = {"instagram": ("ig_queue.json", "ig_posted.txt"), "tiktok": ("tt_queue.json", "tt_posted.txt")}  # logic test: both on
 con = db.connect(str(data / "data" / "hollowfloor.db"))
 pid = 0
 for sid in (1, 2):

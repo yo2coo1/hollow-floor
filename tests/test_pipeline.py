@@ -40,6 +40,7 @@ T = datetime(2026, 12, 1, 13, 0, tzinfo=timezone.utc)  # 08:00 New York
 clock = {"now": T}
 pipeline.utcnow = lambda: clock["now"]
 pipeline.P["youtube_privacy"] = "public"  # this test covers cloud posting, not the hand-posting stopgap
+pipeline.PLATFORMS = ["youtube", "tiktok", "instagram"]  # covers all three whatever the live config is
 pipeline.S["hold_new_part1"] = False  # the test plans new Part 1s whatever the live setting is
 pipeline.S["post_times_local"] = ["12:00", "17:00", "21:00"]  # the test expects 3 slots whatever the live pace is
 con = db.connect()

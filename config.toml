@@ -57,7 +57,7 @@ double      = { voice = "am_liam",    speed = 0.85, pitch = 0.88, label = "ME?" 
 
 [posting]
 max_retries = 3
-platforms = ["youtube", "tiktok", "instagram"]
+platforms = ["youtube", "tiktok"]   # 2026-11-19: Instagram removed (account disabled). To bring it back, add "instagram" here and to [votes] count_platforms
 ai_label = true    # never turn off
 youtube_privacy = "hand"      # "hand" = the cloud leaves YouTube posts queued and the owner's PC posts them publicly in YouTube Studio (API uploads are forced private until the API audit is approved; then set "public")
 tiktok_private = true          # same for TikTok until its app audit
@@ -72,7 +72,7 @@ enabled = true
 min_votes = 5             # fewer than this -> writer's default branch (a new channel gets few comments)
 close_after_hours = 16    # count votes 16 h after Part 1 posts, leaving ~8 h to render and post Part 2 at 24 h
 part2_after_hours = 24    # Part 2 posts this long after Part 1
-count_platforms = ["youtube", "instagram"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
+count_platforms = ["youtube"]   # TikTok's official API can't read comments; TikTok viewers get the winning branch
 
 # Each story picks its own look, camera style and pacing (story["style"]); the variety gate stops repeats.
 # A look sets the light and fog colors (and default intensities); a story's set.lights/fog intensities still win.

@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from hollowfloor import storage  # noqa: E402
-from hollowfloor.config import ROOT  # noqa: E402
+from hollowfloor.config import CONFIG, ROOT  # noqa: E402
 
 LIMIT = 9_600_000  # the browser upload tool takes files up to 10 MB
 
@@ -88,7 +88,8 @@ def due(data):
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
-QUEUES = {"instagram": ("ig_queue.json", "ig_posted.txt"), "tiktok": ("tt_queue.json", "tt_posted.txt")}
+QUEUES = {pf: q for pf, q in {"instagram": ("ig_queue.json", "ig_posted.txt"), "tiktok": ("tt_queue.json", "tt_posted.txt")}.items()
+          if pf in CONFIG["posting"]["platforms"]}  # Instagram is off while config leaves it out
 
 
 def cross_queue(data, post_id, qdir=None):
